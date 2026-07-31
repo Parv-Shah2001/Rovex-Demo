@@ -15,6 +15,7 @@ import threading
 from typing import Dict, Any, List, Optional, Union, Generator
 from sqlalchemy import create_engine, Column, Integer, String, Boolean, Float, DateTime, ForeignKey, text
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
+from sqlalchemy.pool import StaticPool
 
 from app.core.config import SEED_USERS, SEED_ROBOTS, LOG_FILE_PATH
 
@@ -29,7 +30,8 @@ SQL_DATABASE_URL = "sqlite:///:memory:"
 
 engine = create_engine(
     SQL_DATABASE_URL, 
-    connect_args={"check_same_thread": False}
+    connect_args={"check_same_thread": False},
+    poolclass=StaticPool
 )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
