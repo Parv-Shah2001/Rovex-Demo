@@ -16,6 +16,53 @@
         .font-mono-custom {
             font-family: 'Fira Code', monospace;
         }
+        .core-shell {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+        .core-main {
+            flex: 1 1 auto;
+            min-width: 0;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .core-content-split {
+            flex: 1 1 auto;
+            min-height: 0;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr);
+            overflow: hidden;
+        }
+        .core-content-panel {
+            min-width: 0;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+        .core-sidebar {
+            display: none;
+            width: 20rem;
+            flex-shrink: 0;
+        }
+        @media (min-width: 768px) {
+            .core-shell {
+                height: 100vh;
+                flex-direction: row;
+                overflow: hidden;
+            }
+            .core-sidebar {
+                display: flex;
+                height: 100vh;
+            }
+            .core-content-split {
+                grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            }
+        }
         /* Custom scrollbar */
         ::-webkit-scrollbar {
             width: 6px;
@@ -33,10 +80,10 @@
         }
     </style>
 </head>
-<body class="text-slate-100 min-h-screen md:h-screen flex flex-col md:flex-row overflow-x-hidden md:overflow-hidden">
+<body class="core-shell text-slate-100">
 
     <!-- Sidebar (Gemini Style) -->
-    <aside class="w-80 md:h-screen bg-slate-950 border-r border-slate-900 flex flex-col justify-between shrink-0 hidden md:flex">
+    <aside class="core-sidebar bg-slate-950 border-r border-slate-900 flex-col justify-between">
         <div class="p-6 space-y-6 flex-grow overflow-y-auto">
             
             <!-- Company Logo -->
@@ -102,7 +149,7 @@
     </aside>
 
     <!-- Main Central Panel (Gemini Chat & Interactive Graph) -->
-    <main class="flex-grow min-w-0 min-h-0 flex flex-col justify-between overflow-hidden">
+    <main class="core-main">
         
         <!-- Header -->
         <header class="h-16 border-b border-slate-900 bg-slate-950/40 px-6 flex justify-between items-center">
@@ -122,10 +169,10 @@
         </header>
 
         <!-- Dynamic Body Area: Left Side Chat, Right Side Graph Map -->
-        <div class="flex-grow min-h-0 flex flex-col md:flex-row overflow-hidden">
+        <div class="core-content-split">
             
             <!-- Gemini-like Chat & Task Section -->
-            <div class="w-full md:w-1/2 min-w-0 min-h-0 flex flex-col justify-between border-r border-slate-900 overflow-y-auto p-6 space-y-6">
+            <div class="core-content-panel border-b border-slate-900 md:border-b-0 md:border-r p-6 space-y-6">
                 
                 <!-- Gemini Welcome screen / Conversation container -->
                 <div class="flex-grow flex flex-col justify-end space-y-6 min-h-0" id="chatArea">
@@ -185,7 +232,7 @@
             </div>
 
             <!-- Hospital Map & A* Pathfinder Visualization -->
-            <div class="w-full md:w-1/2 min-w-0 min-h-0 flex flex-col justify-between p-6 space-y-6 overflow-y-auto bg-slate-950/20">
+            <div class="core-content-panel p-6 space-y-6 bg-slate-950/20">
                 
                 <!-- Section Header -->
                 <div class="border-b border-slate-900 pb-3">

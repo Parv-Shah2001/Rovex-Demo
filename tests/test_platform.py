@@ -292,12 +292,11 @@ class TestRovexPlatform(unittest.TestCase):
         html = response.body.decode("utf-8")
 
         self.assertEqual(response.status_code, 200)
-        self.assertIn("md:flex-row", html)
-        self.assertIn("md:h-screen", html)
-        self.assertIn("md:overflow-hidden", html)
-        self.assertIn("min-w-0 min-h-0", html)
-        self.assertIn("md:w-1/2", html)
-        self.assertIn("flex-grow min-h-0 flex flex-col md:flex-row overflow-hidden", html)
+        self.assertIn("core-shell", html)
+        self.assertIn("core-main", html)
+        self.assertIn("core-content-split", html)
+        self.assertIn("core-content-panel", html)
+        self.assertIn("@media (min-width: 768px)", html)
 
     def test_template_loader_refreshes_changed_html_files(self):
         """
