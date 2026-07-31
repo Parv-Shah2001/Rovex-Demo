@@ -38,6 +38,11 @@ logger = logging.getLogger("rovex.main")
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 
 _html_cache: dict[str, tuple[int, str]] = {}
+HTML_NO_CACHE_HEADERS = {
+    "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+    "Pragma": "no-cache",
+    "Expires": "0",
+}
 
 
 def _load_template(name: str) -> str:
@@ -53,6 +58,14 @@ def _load_template(name: str) -> str:
     template_content = template_path.read_text(encoding="utf-8")
     _html_cache[name] = (last_modified_ns, template_content)
     return template_content
+
+
+def _html_response(name: str) -> HTMLResponse:
+    """
+    Returns an HTML response with explicit no-cache headers so browser reloads
+    always fetch the newest dashboard markup during rapid UI iteration.
+    """
+    return HTMLResponse(content=_load_template(name), headers=HTML_NO_CACHE_HEADERS)
 
 
 @asynccontextmanager
@@ -96,7 +109,7 @@ def serve_index_page(request: Request):
     """
     Renders the unified landing page and login panel.
     """
-    return HTMLResponse(content=_load_template("index.html"))
+    return _html_response("index.html")
 
 
 @app.get("/core", response_class=HTMLResponse)
@@ -105,7 +118,7 @@ def serve_core_platform_page(request: Request):
     Renders the face-to-face Core Platform dashboard for hospital staff.
     Uses browser client guard to verify authentications, but can also inspect cookies.
     """
-    return HTMLResponse(content=_load_template("core_platform.html"))
+    return _html_response("core_platform.html")
 
 
 @app.get("/admin", response_class=HTMLResponse)
@@ -114,7 +127,7 @@ def serve_admin_platform_page(request: Request):
     Renders the Admin Sandbox and database query tool.
     Restricted to Rovex Admins only. Client-side JS blocks non-admins, but we can also guard here.
     """
-    return HTMLResponse(content=_load_template("admin.html"))
+    return _html_response("admin.html")
 
 
 # =====================================================================

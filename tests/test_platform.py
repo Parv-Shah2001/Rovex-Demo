@@ -26,7 +26,15 @@ from app.services.robot import service as robot_service
 from app.services.robot.schemas import RobotTelemetryPayload
 from app.services.robot.astar import plan_astar_path, hospital_map
 from app.services.notification import service as notification_service
-from app.main import serve_core_platform_page, _load_template, _html_cache, TEMPLATES_DIR
+from app.main import (
+    serve_core_platform_page,
+    serve_index_page,
+    serve_admin_platform_page,
+    _load_template,
+    _html_cache,
+    TEMPLATES_DIR,
+    HTML_NO_CACHE_HEADERS,
+)
 
 
 class TestRovexPlatform(unittest.TestCase):
@@ -302,6 +310,20 @@ class TestRovexPlatform(unittest.TestCase):
         self.assertIn("sidebar-collapsed", html)
         self.assertIn("toggleSidebar()", html)
         self.assertIn("@media (min-width: 768px)", html)
+
+    def test_html_dashboard_routes_disable_browser_caching(self):
+        """
+        Verifies the HTML dashboard responses explicitly disable caching so local
+        browser refreshes pull the latest template markup during UI iteration.
+        """
+        for route_response in (
+            serve_index_page(None),
+            serve_core_platform_page(None),
+            serve_admin_platform_page(None),
+        ):
+            self.assertEqual(route_response.status_code, 200)
+            for header_name, header_value in HTML_NO_CACHE_HEADERS.items():
+                self.assertEqual(route_response.headers.get(header_name), header_value)
 
     def test_template_loader_refreshes_changed_html_files(self):
         """
