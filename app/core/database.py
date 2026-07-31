@@ -1,7 +1,8 @@
 """
 File: app/core/database.py
 Description: Sets up the database connectors. For the SQL database, we use a real SQLAlchemy 
-session backed by an in-memory SQLite engine to perfectly simulate a Postgres OLTP database.
+session backed by an in-memory SQLite engine (with StaticPool to ensure all connections share 
+the same in-memory database) to perfectly simulate a Postgres OLTP database.
 For the NoSQL database, we implement a thread-safe, robust PyMongo/Motor mock that simulates 
 all primary CRUD methods (find, find_one, insert_one, update_one, delete_one, aggregate, distinct) 
 storing documents in an in-memory dictionary.
@@ -31,7 +32,7 @@ SQL_DATABASE_URL = "sqlite:///:memory:"
 engine = create_engine(
     SQL_DATABASE_URL, 
     connect_args={"check_same_thread": False},
-    poolclass=StaticPool
+    poolclass=StaticPool,  # Ensures all connections share the same in-memory database
 )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()

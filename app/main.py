@@ -1,17 +1,17 @@
 """
 File: app/main.py
 Description: Main entry point for the Rovex Hospital Stretcher Robots Backend Platform.
-This file initializes the FastAPI application, sets up the HTML template rendering engine 
-via Jinja2, triggers database schema generation and initial seed loading, and mounts all 
-the service sub-routers (Users, Robots, Notifications, Core Platform, and Admin Dashboard).
+This file initializes the FastAPI application, sets up the HTML template rendering engine,
+triggers database schema generation and initial seed loading, and mounts all the service
+sub-routers (Users, Robots, Notifications, Core Platform, and Admin Dashboard).
 """
 
 import os
 import logging
+from pathlib import Path
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Depends, HTTPException, status
 from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core import config
@@ -32,7 +32,24 @@ logging.basicConfig(
 )
 logger = logging.getLogger("rovex.main")
 
-from contextlib import asynccontextmanager
+# Pre-load HTML templates from disk at module import time.
+# This avoids any Jinja2/Starlette cache compatibility issues with newer versions
+# while keeping the frontend rendering simple and dependency-free.
+TEMPLATES_DIR = Path(__file__).parent / "templates"
+
+_html_cache: dict[str, str] = {}
+
+
+def _load_template(name: str) -> str:
+    """
+    Loads and caches an HTML template file from the templates directory.
+    Uses a simple in-memory cache to avoid repeated disk reads.
+    """
+    if name not in _html_cache:
+        template_path = TEMPLATES_DIR / name
+        _html_cache[name] = template_path.read_text(encoding="utf-8")
+    return _html_cache[name]
+
 
 @asynccontextmanager
 async def lifespan(app_instance: FastAPI):
@@ -44,6 +61,7 @@ async def lifespan(app_instance: FastAPI):
     init_db()
     logger.info("Databases and seeds initialized successfully.")
     yield
+
 
 app = FastAPI(
     title="Rovex Hospital Robotics Backend Platform",
@@ -61,9 +79,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Configure Jinja2 templates directory
-templates = Jinja2Templates(directory="app/templates")
-
 # Initialize database schemas immediately to guarantee tables exist across all threads/sessions
 init_db()
 
@@ -77,7 +92,7 @@ def serve_index_page(request: Request):
     """
     Renders the unified landing page and login panel.
     """
-    return templates.TemplateResponse(request=request, name="index.html")
+    return HTMLResponse(content=_load_template("index.html"))
 
 
 @app.get("/core", response_class=HTMLResponse)
@@ -86,8 +101,7 @@ def serve_core_platform_page(request: Request):
     Renders the face-to-face Core Platform dashboard for hospital staff.
     Uses browser client guard to verify authentications, but can also inspect cookies.
     """
-    # Simply render template; client-side JS handles token decoding and RBAC verification
-    return templates.TemplateResponse(request=request, name="core_platform.html")
+    return HTMLResponse(content=_load_template("core_platform.html"))
 
 
 @app.get("/admin", response_class=HTMLResponse)
@@ -96,7 +110,7 @@ def serve_admin_platform_page(request: Request):
     Renders the Admin Sandbox and database query tool.
     Restricted to Supervisors. Client-side JS blocks non-admins, but we can also guard here.
     """
-    return templates.TemplateResponse(request=request, name="admin.html")
+    return HTMLResponse(content=_load_template("admin.html"))
 
 
 # =====================================================================
