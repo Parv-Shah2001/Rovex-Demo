@@ -33,7 +33,7 @@
         }
     </style>
 </head>
-<body class="text-slate-100 min-h-screen md:h-screen flex flex-col md:flex-row overflow-x-hidden">
+<body class="text-slate-100 min-h-screen md:h-screen flex flex-col md:flex-row overflow-x-hidden md:overflow-hidden">
 
     <!-- Sidebar (Gemini Style) -->
     <aside class="w-80 md:h-screen bg-slate-950 border-r border-slate-900 flex flex-col justify-between shrink-0 hidden md:flex">
@@ -102,7 +102,7 @@
     </aside>
 
     <!-- Main Central Panel (Gemini Chat & Interactive Graph) -->
-    <main class="flex-grow min-w-0 flex flex-col justify-between overflow-hidden">
+    <main class="flex-grow min-w-0 min-h-0 flex flex-col justify-between overflow-hidden">
         
         <!-- Header -->
         <header class="h-16 border-b border-slate-900 bg-slate-950/40 px-6 flex justify-between items-center">
@@ -122,10 +122,10 @@
         </header>
 
         <!-- Dynamic Body Area: Left Side Chat, Right Side Graph Map -->
-        <div class="flex-grow flex flex-col lg:flex-row overflow-hidden">
+        <div class="flex-grow min-h-0 flex flex-col lg:flex-row overflow-hidden">
             
             <!-- Gemini-like Chat & Task Section -->
-            <div class="w-full lg:w-1/2 flex flex-col justify-between border-r border-slate-900 overflow-y-auto p-6 space-y-6">
+            <div class="w-full lg:w-1/2 min-w-0 min-h-0 flex flex-col justify-between border-r border-slate-900 overflow-y-auto p-6 space-y-6">
                 
                 <!-- Gemini Welcome screen / Conversation container -->
                 <div class="flex-grow flex flex-col justify-end space-y-6 min-h-0" id="chatArea">
@@ -185,7 +185,7 @@
             </div>
 
             <!-- Hospital Map & A* Pathfinder Visualization -->
-            <div class="w-full lg:w-1/2 flex flex-col justify-between p-6 space-y-6 overflow-y-auto bg-slate-950/20">
+            <div class="w-full lg:w-1/2 min-w-0 min-h-0 flex flex-col justify-between p-6 space-y-6 overflow-y-auto bg-slate-950/20">
                 
                 <!-- Section Header -->
                 <div class="border-b border-slate-900 pb-3">

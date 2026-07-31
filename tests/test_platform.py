@@ -11,6 +11,7 @@ Validates:
 """
 
 import os
+import uuid
 import unittest
 import json
 from datetime import datetime
@@ -25,7 +26,7 @@ from app.services.robot import service as robot_service
 from app.services.robot.schemas import RobotTelemetryPayload
 from app.services.robot.astar import plan_astar_path, hospital_map
 from app.services.notification import service as notification_service
-from app.main import serve_core_platform_page
+from app.main import serve_core_platform_page, _load_template, _html_cache, TEMPLATES_DIR
 
 
 class TestRovexPlatform(unittest.TestCase):
@@ -293,7 +294,30 @@ class TestRovexPlatform(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("md:flex-row", html)
         self.assertIn("md:h-screen", html)
-        self.assertIn("min-w-0", html)
+        self.assertIn("md:overflow-hidden", html)
+        self.assertIn("min-w-0 min-h-0", html)
+
+    def test_template_loader_refreshes_changed_html_files(self):
+        """
+        Verifies the lightweight HTML loader refreshes cached content after a file
+        changes so the running application does not keep serving stale templates.
+        """
+        template_name = f"_test_template_{uuid.uuid4().hex}.html"
+        template_path = TEMPLATES_DIR / template_name
+
+        try:
+            template_path.write_text("version-one", encoding="utf-8")
+            first_render = _load_template(template_name)
+
+            template_path.write_text("version-two", encoding="utf-8")
+            second_render = _load_template(template_name)
+
+            self.assertEqual(first_render, "version-one")
+            self.assertEqual(second_render, "version-two")
+        finally:
+            _html_cache.pop(template_name, None)
+            if template_path.exists():
+                template_path.unlink()
 
 
 if __name__ == "__main__":

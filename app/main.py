@@ -37,18 +37,22 @@ logger = logging.getLogger("rovex.main")
 # while keeping the frontend rendering simple and dependency-free.
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 
-_html_cache: dict[str, str] = {}
+_html_cache: dict[str, tuple[int, str]] = {}
 
 
 def _load_template(name: str) -> str:
     """
-    Loads and caches an HTML template file from the templates directory.
-    Uses a simple in-memory cache to avoid repeated disk reads.
+    Loads an HTML template directly from disk and records the latest snapshot.
+
+    The templates in this demo are small, so prioritizing correctness over an
+    aggressive cache avoids stale frontend markup when HTML files are edited
+    while the application process remains alive.
     """
-    if name not in _html_cache:
-        template_path = TEMPLATES_DIR / name
-        _html_cache[name] = template_path.read_text(encoding="utf-8")
-    return _html_cache[name]
+    template_path = TEMPLATES_DIR / name
+    last_modified_ns = template_path.stat().st_mtime_ns
+    template_content = template_path.read_text(encoding="utf-8")
+    _html_cache[name] = (last_modified_ns, template_content)
+    return template_content
 
 
 @asynccontextmanager
