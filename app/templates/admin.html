@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Platform & Sandboxed Database Explorer</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap');
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #090d16;
+        }
+        .font-mono-custom {
+            font-family: 'Fira Code', monospace;
+        }
+    </style>
+</head>
+<body class="text-slate-100 min-h-screen flex flex-col">
+
+    <!-- Navbar -->
+    <nav class="border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md px-6 py-4 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-violet-600 flex items-center justify-center shadow-lg shadow-violet-500/20">
+                    <i class="fa-solid fa-screwdriver-wrench text-xl text-white"></i>
+                </div>
+                <div>
+                    <span class="text-lg font-bold tracking-tight bg-gradient-to-r from-white to-violet-300 bg-clip-text text-transparent">ROVEX ADMIN PLATFORM</span>
+                    <span class="text-[10px] block text-slate-400 font-medium tracking-widest uppercase">Secured Sandbox & Telemetry Monitor</span>
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-4">
+                <span id="userInfo" class="text-xs bg-slate-800 px-3 py-1.5 rounded-lg text-slate-300 font-medium">
+                    <i class="fa-solid fa-user-shield text-violet-400 mr-1.5"></i> Admin: <span id="usernameVal">...</span>
+                </span>
+                <a href="/core" class="text-xs bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-400 border border-indigo-500/30 px-3 py-1.5 rounded-lg transition duration-200">
+                    <i class="fa-solid fa-compass mr-1"></i> Core Platform
+                </a>
+                <button onclick="handleLogout()" class="text-xs bg-rose-950/30 hover:bg-rose-950/60 text-rose-400 border border-rose-900/40 px-3 py-1.5 rounded-lg transition duration-200">
+                    <i class="fa-solid fa-right-from-bracket mr-1"></i> Logout
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Dashboard Body -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-6 py-8 space-y-8">
+        
+        <!-- Dashboard Statistics Row -->
+        <section class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="bg-slate-900/50 border border-slate-800/80 p-5 rounded-xl space-y-2">
+                <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Total Connected Users</span>
+                <div class="flex items-center justify-between">
+                    <span id="statUsers" class="text-2xl font-extrabold text-white">0</span>
+                    <i class="fa-solid fa-users text-xl text-indigo-500"></i>
+                </div>
+                <p class="text-[9px] text-slate-500">In relational SQL OLTP</p>
+            </div>
+
+            <div class="bg-slate-900/50 border border-slate-800/80 p-5 rounded-xl space-y-2">
+                <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Total Active Fleet</span>
+                <div class="flex items-center justify-between">
+                    <span id="statRobots" class="text-2xl font-extrabold text-white">0</span>
+                    <i class="fa-solid fa-robot text-xl text-violet-500"></i>
+                </div>
+                <p class="text-[9px] text-slate-500">In mock document NoSQL</p>
+            </div>
+
+            <div class="bg-slate-900/50 border border-slate-800/80 p-5 rounded-xl space-y-2">
+                <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Average Fleet Power</span>
+                <div class="flex items-center justify-between">
+                    <span id="statBattery" class="text-2xl font-extrabold text-white">0.0%</span>
+                    <i class="fa-solid fa-battery-three-quarters text-xl text-emerald-500"></i>
+                </div>
+                <p class="text-[9px] text-slate-500">Weighted charge remaining</p>
+            </div>
+
+            <div class="bg-slate-900/50 border border-slate-800/80 p-5 rounded-xl space-y-2">
+                <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Offline / Unsanctioned</span>
+                <div class="flex items-center justify-between">
+                    <span id="statUnsanctioned" class="text-2xl font-extrabold text-white">0</span>
+                    <i class="fa-solid fa-ban text-xl text-rose-500"></i>
+                </div>
+                <p class="text-[9px] text-slate-500">Schedules locked offline</p>
+            </div>
+        </section>
+
+        <!-- Relational & Document View Split -->
+        <section class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            
+            <!-- SQL User Base (Postgres Simulated) -->
+            <div class="bg-slate-900/30 border border-slate-800 p-6 rounded-2xl space-y-4">
+                <div class="flex justify-between items-center">
+                    <h3 class="font-bold text-base flex items-center space-x-2">
+                        <i class="fa-solid fa-database text-indigo-400"></i>
+                        <span>Relational Database: Users & RBAC (SQL OLTP)</span>
+                    </h3>
+                    <span class="text-[9px] px-2 py-0.5 font-mono bg-indigo-950 text-indigo-400 border border-indigo-900 rounded">SQLite Seeded</span>
+                </div>
+                
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs text-left">
+                        <thead class="text-slate-400 font-bold bg-slate-950/40 border-b border-slate-800">
+                            <tr>
+                                <th class="p-3">Staff Name</th>
+                                <th class="p-3">Username</th>
+                                <th class="p-3">Institution Org</th>
+                                <th class="p-3">RBAC Policy</th>
+                            </tr>
+                        </thead>
+                        <tbody id="usersTableBody">
+                            <tr>
+                                <td colspan="4" class="p-4 text-center text-slate-500">Loading user list...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- NoSQL Robot Fleet (MongoDB Simulated) -->
+            <div class="bg-slate-900/30 border border-slate-800 p-6 rounded-2xl space-y-4">
+                <div class="flex justify-between items-center">
+                    <h3 class="font-bold text-base flex items-center space-x-2">
+                        <i class="fa-solid fa-cubes text-violet-400"></i>
+                        <span>NoSQL Document Database: Robots (PyMongo)</span>
+                    </h3>
+                    <span class="text-[9px] px-2 py-0.5 font-mono bg-violet-950 text-violet-400 border border-violet-900 rounded">PyMongo Mock</span>
+                </div>
+                
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs text-left">
+                        <thead class="text-slate-400 font-bold bg-slate-950/40 border-b border-slate-800">
+                            <tr>
+                                <th class="p-3">Robot ID</th>
+                                <th class="p-3">Macro-Location</th>
+                                <th class="p-3">Battery</th>
+                                <th class="p-3">State</th>
+                                <th class="p-3">Sanctioned</th>
+                            </tr>
+                        </thead>
+                        <tbody id="robotsTableBody">
+                            <tr>
+                                <td colspan="5" class="p-4 text-center text-slate-500">Loading robot fleet...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- Live Streaming System Logs (Consolidated Data Pool) -->
+        <section class="bg-slate-900/40 border border-slate-800 p-6 rounded-2xl space-y-4">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h3 class="font-bold text-base flex items-center space-x-2">
+                        <i class="fa-solid fa-terminal text-emerald-400"></i>
+                        <span>Live Consolidated Logs (Data Pool Stream)</span>
+                    </h3>
+                    <p class="text-[11px] text-slate-400">Pings, telemetry ingestion updates, and critical system notifications on disk.</p>
+                </div>
+                <button onclick="fetchLogs()" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg border border-slate-700 transition">
+                    <i class="fa-solid fa-rotate-right mr-1"></i> Refresh Logs
+                </button>
+            </div>
+            
+            <div class="bg-black/80 border border-slate-800/80 p-4 rounded-xl">
+                <pre id="logConsole" class="text-[11px] font-mono-custom text-emerald-500 h-44 overflow-y-auto whitespace-pre-wrap leading-relaxed select-text">Reading log file from disk...</pre>
+            </div>
+        </section>
+
+        <!-- Database Sandbox Workspace -->
+        <section class="bg-slate-900/60 border border-slate-800 p-6 rounded-2xl space-y-6">
+            <div class="border-b border-slate-800 pb-4">
+                <h3 class="font-bold text-lg flex items-center space-x-2">
+                    <i class="fa-solid fa-shield-halved text-rose-400"></i>
+                    <span>Secured Database Sandbox Query Workspace</span>
+                </h3>
+                <p class="text-xs text-slate-400">Run manual SQL select or mock PyMongo commands against the active database engines instantly.</p>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                
+                <!-- Query Config Side -->
+                <div class="lg:col-span-2 space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Target Database Engine</label>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button id="btnSql" onclick="setDbEngine('sql')" class="p-3 rounded-xl border border-slate-700 bg-indigo-950/20 text-indigo-400 font-bold text-xs flex flex-col items-center justify-center space-y-1 hover:bg-indigo-950/40 transition">
+                                <i class="fa-solid fa-database text-base"></i>
+                                <span>SQL (SQLite OLTP)</span>
+                            </button>
+                            <button id="btnNoSql" onclick="setDbEngine('nosql')" class="p-3 rounded-xl border border-slate-800 bg-slate-950 text-slate-500 font-bold text-xs flex flex-col items-center justify-center space-y-1 hover:bg-violet-950/20 hover:text-violet-400 transition">
+                                <i class="fa-solid fa-cubes text-base"></i>
+                                <span>NoSQL (PyMongo)</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Sandbox Templates -->
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Query Snippet Templates</label>
+                        <div class="space-y-2" id="templatesList">
+                            <!-- SQL Templates -->
+                            <button onclick="applyTemplate('SELECT * FROM users')" class="sql-template w-full text-left p-2.5 bg-slate-950 hover:bg-slate-900 border border-slate-800/80 rounded-lg text-xs font-mono-custom text-indigo-300 transition block">
+                                SELECT * FROM users;
+                            </button>
+                            <button onclick="applyTemplate('SELECT * FROM tasks WHERE status=\'ongoing\'')" class="sql-template w-full text-left p-2.5 bg-slate-950 hover:bg-slate-900 border border-slate-800/80 rounded-lg text-xs font-mono-custom text-indigo-300 transition block">
+                                SELECT * FROM tasks WHERE status='ongoing';
+                            </button>
+                            
+                            <!-- NoSQL Templates (Hidden by default) -->
+                            <button onclick="applyTemplate('db.robots.find()')" class="nosql-template hidden w-full text-left p-2.5 bg-slate-950 hover:bg-slate-900 border border-slate-800/80 rounded-lg text-xs font-mono-custom text-violet-300 transition block">
+                                db.robots.find()
+                            </button>
+                            <button onclick="applyTemplate('db.robots.find({\'battery\': {\'$lt\': 50}})')" class="nosql-template hidden w-full text-left p-2.5 bg-slate-950 hover:bg-slate-900 border border-slate-800/80 rounded-lg text-xs font-mono-custom text-violet-300 transition block">
+                                db.robots.find({"battery": {"$lt": 50}})
+                            </button>
+                            <button onclick="applyTemplate('db.notifications.find({\'category\': \'CRITICAL\'})')" class="nosql-template hidden w-full text-left p-2.5 bg-slate-950 hover:bg-slate-900 border border-slate-800/80 rounded-lg text-xs font-mono-custom text-violet-300 transition block">
+                                db.notifications.find({"category": "CRITICAL"})
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Query Editor & Output Side -->
+                <div class="lg:col-span-3 space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Sandbox Editor</label>
+                        <textarea id="queryEditor" rows="5" class="w-full bg-slate-950 font-mono-custom text-xs p-4 rounded-xl border border-slate-800 focus:border-indigo-500 focus:outline-none text-emerald-400 whitespace-pre leading-relaxed select-text" placeholder="Enter query here...">SELECT * FROM users</textarea>
+                    </div>
+
+                    <div class="flex justify-between items-center">
+                        <span class="text-[10px] text-slate-500"><i class="fa-solid fa-triangle-exclamation text-yellow-500/80 mr-1"></i> SELECT statements only are authorized in the SQL sandbox.</span>
+                        <button onclick="executeQuery()" class="bg-gradient-to-r from-rose-600 to-violet-600 hover:from-rose-500 hover:to-violet-500 text-white font-bold text-xs px-6 py-2.5 rounded-xl transition shadow-lg shadow-rose-600/10 hover:shadow-rose-600/25">
+                            <i class="fa-solid fa-play mr-1.5"></i> Run Sandbox Query
+                        </button>
+                    </div>
+
+                    <!-- Query Result Output -->
+                    <div class="space-y-2">
+                        <label class="block text-xs font-bold uppercase tracking-wider text-slate-400">Query Results</label>
+                        <div class="bg-black/90 border border-slate-800/80 rounded-xl p-4 overflow-x-auto">
+                            <pre id="queryResult" class="text-[11px] font-mono-custom text-slate-300 max-h-56 overflow-y-auto leading-relaxed select-text">Execution outputs will be displayed here...</pre>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-800/60 bg-slate-950 px-6 py-6 text-center text-xs text-slate-500">
+        &copy; 2026 Rovex Systems Administration Hub. Secured Session.
+    </footer>
+
+    <script>
+        // Set local storage variables
+        let selectedEngine = 'sql';
+        const token = localStorage.getItem('rovex_token');
+        const userObj = JSON.parse(localStorage.getItem('rovex_user') || '{}');
+
+        // Initializer
+        window.addEventListener('DOMContentLoaded', async () => {
+            // Guard check: is user authenticated and Supervisor?
+            if (!token || !userObj || userObj.role !== 'supervisor') {
+                alert("Access Denied: Only users with 'supervisor' role can access the Admin Platform dashboard.");
+                window.location.href = '/';
+                return;
+            }
+
+            document.getElementById('usernameVal').innerText = userObj.full_name;
+            
+            // Fetch initial platform stats and logs
+            await fetchDashboardStats();
+            await fetchUsersList();
+            await fetchRobotsList();
+            await fetchLogs();
+        });
+
+        // Logout
+        function handleLogout() {
+            localStorage.clear();
+            document.cookie = "access_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+            window.location.href = '/';
+        }
+
+        // Set DB Engine toggle
+        function setDbEngine(engine) {
+            selectedEngine = engine;
+            const btnSql = document.getElementById('btnSql');
+            const btnNoSql = document.getElementById('btnNoSql');
+            const sqlTemplates = document.querySelectorAll('.sql-template');
+            const nosqlTemplates = document.querySelectorAll('.nosql-template');
+            const editor = document.getElementById('queryEditor');
+
+            if (engine === 'sql') {
+                btnSql.className = 'p-3 rounded-xl border border-indigo-700 bg-indigo-950/20 text-indigo-400 font-bold text-xs flex flex-col items-center justify-center space-y-1 transition';
+                btnNoSql.className = 'p-3 rounded-xl border border-slate-800 bg-slate-950 text-slate-500 font-bold text-xs flex flex-col items-center justify-center space-y-1 transition';
+                
+                sqlTemplates.forEach(t => t.classList.remove('hidden'));
+                nosqlTemplates.forEach(t => t.classList.add('hidden'));
+                editor.value = "SELECT * FROM users";
+            } else {
+                btnNoSql.className = 'p-3 rounded-xl border border-violet-700 bg-violet-950/20 text-violet-400 font-bold text-xs flex flex-col items-center justify-center space-y-1 transition';
+                btnSql.className = 'p-3 rounded-xl border border-slate-800 bg-slate-950 text-slate-500 font-bold text-xs flex flex-col items-center justify-center space-y-1 transition';
+                
+                nosqlTemplates.forEach(t => t.classList.remove('hidden'));
+                sqlTemplates.forEach(t => t.classList.add('hidden'));
+                editor.value = "db.robots.find()";
+            }
+        }
+
+        // Apply templates to editor
+        function applyTemplate(query) {
+            document.getElementById('queryEditor').value = query;
+        }
+
+        // Fetch Dashboard statistical counts
+        async function fetchDashboardStats() {
+            try {
+                const res = await fetch('/api/admin/stats', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    const stats = await res.json();
+                    document.getElementById('statUsers').innerText = stats.total_users;
+                    document.getElementById('statRobots').innerText = stats.total_robots;
+                    document.getElementById('statBattery').innerText = stats.average_robot_battery + '%';
+                    document.getElementById('statUnsanctioned').innerText = stats.un_sanctioned_robots;
+                }
+            } catch (err) {
+                console.error("Stats fetching error", err);
+            }
+        }
+
+        // Fetch user database
+        async function fetchUsersList() {
+            try {
+                const res = await fetch('/api/users', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    const users = await res.json();
+                    let html = '';
+                    users.forEach(u => {
+                        html += `
+                        <tr class="border-b border-slate-800 hover:bg-slate-900/20 transition">
+                            <td class="p-3 font-semibold text-white">${u.full_name}</td>
+                            <td class="p-3 font-mono text-[11px] text-indigo-300">${u.username}</td>
+                            <td class="p-3 text-slate-400">${u.organization}</td>
+                            <td class="p-3">
+                                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                    u.role === 'supervisor' ? 'bg-red-500/10 text-red-400 border border-red-500/25' :
+                                    u.role === 'sub-supervisor' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/25' :
+                                    'bg-slate-500/10 text-slate-400 border border-slate-500/25'
+                                }">
+                                    ${u.role}
+                                </span>
+                            </td>
+                        </tr>
+                        `;
+                    });
+                    document.getElementById('usersTableBody').innerHTML = html;
+                }
+            } catch (err) {
+                console.error("Users list fetch error", err);
+            }
+        }
+
+        // Fetch Robot Fleet NoSQL status
+        async function fetchRobotsList() {
+            try {
+                const res = await fetch('/api/robots', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    const robots = await res.json();
+                    let html = '';
+                    robots.forEach(r => {
+                        html += `
+                        <tr class="border-b border-slate-800 hover:bg-slate-900/20 transition">
+                            <td class="p-3 font-bold text-white">${r.robot_id} <span class="text-[9px] font-normal block text-slate-500 font-mono-custom">${r.serial_number}</span></td>
+                            <td class="p-3 text-slate-400">${r.location}</td>
+                            <td class="p-3 font-semibold ${r.battery > 50 ? 'text-emerald-400' : r.battery > 20 ? 'text-amber-400' : 'text-rose-400'}">${r.battery}%</td>
+                            <td class="p-3">
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold ${
+                                    r.status === 'idle' ? 'bg-slate-800 text-slate-300' :
+                                    r.status === 'transit' ? 'bg-indigo-950 text-indigo-400 border border-indigo-900/40' :
+                                    r.status === 'charging' ? 'bg-emerald-950 text-emerald-400 border border-emerald-900/40' :
+                                    'bg-rose-950 text-rose-400 border border-rose-900/40'
+                                }">
+                                    ${r.status.toUpperCase()}
+                                </span>
+                            </td>
+                            <td class="p-3">
+                                <button onclick="toggleRobotSanction('${r.robot_id}', ${r.sanctioned})" class="px-2.5 py-1 rounded text-[10px] font-bold transition ${
+                                    r.sanctioned ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 hover:bg-rose-500/10 hover:text-rose-400 hover:border-rose-500/25' : 
+                                    'bg-rose-500/10 text-rose-400 border border-rose-500/25 hover:bg-emerald-500/10 hover:text-emerald-400 hover:border-emerald-500/25'
+                                }">
+                                    ${r.sanctioned ? 'Sanctioned' : 'Banned'}
+                                </button>
+                            </td>
+                        </tr>
+                        `;
+                    });
+                    document.getElementById('robotsTableBody').innerHTML = html;
+                }
+            } catch (err) {
+                console.error("Robots list fetch error", err);
+            }
+        }
+
+        // Toggle robot sanction
+        async function toggleRobotSanction(robotId, currentSanction) {
+            try {
+                const res = await fetch(`/api/robots/${robotId}/sanction`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ sanctioned: !currentSanction })
+                });
+                if (res.ok) {
+                    await fetchRobotsList();
+                    await fetchDashboardStats();
+                    await fetchLogs();
+                } else {
+                    const err = await res.json();
+                    alert("Error changing sanction: " + err.detail);
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        // Fetch file logs
+        async function fetchLogs() {
+            try {
+                const res = await fetch('/api/notifications/logs?lines=100', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    const consoleEl = document.getElementById('logConsole');
+                    consoleEl.innerText = data.logs;
+                    consoleEl.scrollTop = consoleEl.scrollHeight; // Auto scroll to bottom
+                }
+            } catch (err) {
+                console.error("Logs fetching error", err);
+            }
+        }
+
+        // Run custom query inside sandbox
+        async function executeQuery() {
+            const queryBox = document.getElementById('queryResult');
+            queryBox.innerText = 'Evaluating query in database secure sandbox...';
+            
+            const query_string = document.getElementById('queryEditor').value;
+            
+            try {
+                const res = await fetch('/api/admin/query', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ db_type: selectedEngine, query_string })
+                });
+                
+                const data = await res.json();
+                if (res.ok) {
+                    queryBox.innerHTML = syntaxHighlight(JSON.stringify(data.data, null, 2));
+                    // Refresh databases visually if we updated things
+                    await fetchUsersList();
+                    await fetchRobotsList();
+                    await fetchDashboardStats();
+                } else {
+                    queryBox.innerHTML = `<span class="text-rose-400">Error: ${data.detail || 'Failed to parse query.'}</span>`;
+                }
+            } catch (err) {
+                queryBox.innerHTML = `<span class="text-rose-400">Network error compiling sandbox request.</span>`;
+                console.error(err);
+            }
+        }
+
+        // Simple JSON syntax high lighter helper
+        function syntaxHighlight(json) {
+            if (!json) return "";
+            json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?)/g, function (match) {
+                let cls = 'text-amber-300'; // number/string
+                if (/^"/.test(match)) {
+                    if (/:$/.test(match)) {
+                        cls = 'text-indigo-400 font-semibold'; // key
+                    } else {
+                        cls = 'text-emerald-400'; // string value
+                    }
+                } else if (/true|false/.test(match)) {
+                    cls = 'text-orange-400';
+                } else if (/null/.test(match)) {
+                    cls = 'text-slate-500';
+                }
+                return '<span class="' + cls + '">' + match + '</span>';
+            });
+        }
+    </script>
+</body>
+</html>

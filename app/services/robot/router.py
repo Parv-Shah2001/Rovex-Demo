@@ -1,0 +1,174 @@
+"""
+File: app/services/robot/router.py
+Description: FastAPI Router exposing Robot Management and Route Optimization API endpoints.
+Provides routes for telemetry ingestion, robot profile lookups, sanction controls,
+A* path planning calculations, and real-time graph edge weight adjustments.
+"""
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from typing import List, Dict, Any, Optional
+
+from app.core.database import MockDatabase, get_nosql_db
+from app.core.auth import get_current_user_from_cookie_or_header, RBACChecker
+from app.services.robot.schemas import (
+    RobotTelemetryPayload, 
+    RobotResponse, 
+    UpdateSanctionRequest, 
+    UpdateEdgeWeightRequest,
+    AStarPlanRequest
+)
+from app.services.robot import service as robot_service
+from app.services.robot import astar
+
+router = APIRouter(prefix="/api/robots", tags=["Robot Management"])
+
+
+@router.post("/telemetry", response_model=Dict[str, Any], status_code=status.HTTP_201_CREATED)
+def post_robot_telemetry(payload: RobotTelemetryPayload, db: MockDatabase = Depends(get_nosql_db)):
+    """
+    Ingestion endpoint for concurrent streaming robot telemetry payloads.
+    Validates physical parameters, safety triggers, and diagnostic indicators.
+    Saves to the telemetry pool and updates the live robot status.
+    """
+    try:
+        saved_telemetry = robot_service.ingest_robot_telemetry(db, payload)
+        return {"status": "success", "detail": "Telemetry processed successfully", "payload": saved_telemetry}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to ingest telemetry payload: {e}"
+        )
+
+
+@router.get("", response_model=List[RobotResponse])
+def list_robots(
+    current_user: Dict[str, Any] = Depends(get_current_user_from_cookie_or_header),
+    db: MockDatabase = Depends(get_nosql_db)
+):
+    """
+    Lists all robot devices registered under the current user's institution/organization.
+    Access is open to all authenticated staff members (Supervisor, Sub-supervisor, Employee).
+    """
+    robots = robot_service.get_robots_by_organization(db, current_user["organization"])
+    return robots
+
+
+@router.get("/graph/layout", response_model=Dict[str, Any])
+def get_graph_layout(current_user: Dict[str, Any] = Depends(get_current_user_from_cookie_or_header)):
+    """
+    Returns the hospital layout graph, including 2D node coordinates and edge weights.
+    Used by the frontend to render the visual corridor network.
+    """
+    return {
+        "nodes": astar.hospital_map.get_nodes(),
+        "edges": astar.hospital_map.get_edges()
+    }
+
+
+@router.put("/graph/edge", response_model=Dict[str, Any])
+def adjust_corridor_weight(
+    payload: UpdateEdgeWeightRequest,
+    current_user: Dict[str, Any] = Depends(RBACChecker(["supervisor", "sub-supervisor"]))
+):
+    """
+    Dynamically adjusts the weight of a graph edge (e.g. increase weight for crowded corridors).
+    Allows supervisors and sub-supervisors to optimize robot fleet routing.
+    """
+    success = astar.hospital_map.update_edge_weight(payload.node_a, payload.node_b, payload.weight)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Edge connecting '{payload.node_a}' and '{payload.node_b}' was not found in graph."
+        )
+    return {
+        "status": "success", 
+        "detail": f"Corridor weight for {payload.node_a} <-> {payload.node_b} adjusted to {payload.weight}."
+    }
+
+
+@router.post("/path-planning", response_model=Dict[str, Any])
+def calculate_optimal_path(
+    payload: AStarPlanRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user_from_cookie_or_header)
+):
+    """
+    Runs the A* pathfinding algorithm on the active hospital map.
+    Returns the optimal list of nodes, total cost, total distance, and step logs.
+    """
+    result = astar.plan_astar_path(payload.start_node, payload.goal_node)
+    if not result:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Could not calculate path between '{payload.start_node}' and '{payload.goal_node}'. Check node connections."
+        )
+    return result
+
+
+@router.get("/{robot_id}", response_model=RobotResponse)
+def get_robot_profile(
+    robot_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user_from_cookie_or_header),
+    db: MockDatabase = Depends(get_nosql_db)
+):
+    """
+    Returns the full detailed biodata profile of a single robot.
+    Ensures that the robot belongs to the user's registered organization.
+    """
+    robot = robot_service.get_robot_by_id(db, robot_id)
+    if not robot:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Robot with ID '{robot_id}' was not found."
+        )
+        
+    # Security: check organizational boundary
+    if robot["organization"] != current_user["organization"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access Denied. This robot belongs to another institution."
+        )
+    return robot
+
+
+@router.put("/{robot_id}/sanction", response_model=RobotResponse)
+def modify_robot_sanction_status(
+    robot_id: str,
+    payload: UpdateSanctionRequest,
+    current_user: Dict[str, Any] = Depends(RBACChecker(["supervisor"])),
+    db: MockDatabase = Depends(get_nosql_db)
+):
+    """
+    Allows a Supervisor to sanction or un-sanction a robot.
+    Un-sanctioned robots cannot accept transport tasks.
+    """
+    robot = robot_service.get_robot_by_id(db, robot_id)
+    if not robot:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Robot with ID '{robot_id}' was not found."
+        )
+        
+    updated_robot = robot_service.update_robot_sanction(db, robot_id, payload.sanctioned)
+    return updated_robot
+
+
+@router.get("/{robot_id}/telemetry-logs", response_model=List[Dict[str, Any]])
+def get_robot_telemetry_history(
+    robot_id: str,
+    limit: int = 15,
+    current_user: Dict[str, Any] = Depends(get_current_user_from_cookie_or_header),
+    db: MockDatabase = Depends(get_nosql_db)
+):
+    """
+    Retrieves the historical telemetry stream logs for a single robot.
+    Used for analytics and log auditing.
+    """
+    robot = robot_service.get_robot_by_id(db, robot_id)
+    if not robot:
+         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Robot not found")
+         
+    if robot["organization"] != current_user["organization"]:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access Denied.")
+        
+    logs = robot_service.get_recent_telemetry(db, robot_id, limit)
+    return logs
