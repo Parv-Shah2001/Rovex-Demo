@@ -6,9 +6,10 @@ and RBAC role updates, integrated directly with SQLAlchemy sessions.
 """
 
 import logging
-from typing import List, Optional, Dict, Any
+from typing import List, Optional
 from sqlalchemy.orm import Session
 
+from app.core.config import VALID_ROLES
 from app.core.database import UserSQL
 from app.services.user.schemas import UserCreate
 
@@ -50,10 +51,8 @@ def create_user(db: Session, payload: UserCreate) -> UserSQL:
     if existing_user:
         raise ValueError(f"Username '{payload.username}' is already in use.")
         
-    # Restrict roles to known types
-    allowed_roles = ["admin", "supervisor", "sub-supervisor", "employee"]
-    if payload.role not in allowed_roles:
-        raise ValueError(f"Invalid role '{payload.role}'. Must be one of: {allowed_roles}")
+    if payload.role not in VALID_ROLES:
+        raise ValueError(f"Invalid role '{payload.role}'. Must be one of: {list(VALID_ROLES)}")
 
     db_user = UserSQL(
         username=payload.username,
@@ -76,9 +75,8 @@ def update_user_role(db: Session, username: str, new_role: str) -> UserSQL:
     Modifies the RBAC role of a user.
     Raises ValueError if the user is not found or the role is invalid.
     """
-    allowed_roles = ["admin", "supervisor", "sub-supervisor", "employee"]
-    if new_role not in allowed_roles:
-        raise ValueError(f"Invalid role '{new_role}'. Must be one of: {allowed_roles}")
+    if new_role not in VALID_ROLES:
+        raise ValueError(f"Invalid role '{new_role}'. Must be one of: {list(VALID_ROLES)}")
 
     user = get_user_by_username(db, username)
     if not user:
@@ -93,13 +91,23 @@ def update_user_role(db: Session, username: str, new_role: str) -> UserSQL:
 
 def get_all_users(db: Session) -> List[UserSQL]:
     """
-    Returns all registered users across all organizations. Used primarily by Admin dashboards.
+    Returns all registered users across all organizations.
+
+    Results are ordered deterministically so admin dashboards and tests do not
+    depend on database insertion order.
     """
-    return db.query(UserSQL).all()
+    return db.query(UserSQL).order_by(UserSQL.organization.asc(), UserSQL.full_name.asc()).all()
 
 
 def get_users_by_organization(db: Session, organization: str) -> List[UserSQL]:
     """
     Filters and returns users belonging to a specific institution.
+
+    Ordering by full name keeps organization-scoped views stable and easier to scan.
     """
-    return db.query(UserSQL).filter(UserSQL.organization == organization).all()
+    return (
+        db.query(UserSQL)
+        .filter(UserSQL.organization == organization)
+        .order_by(UserSQL.full_name.asc())
+        .all()
+    )

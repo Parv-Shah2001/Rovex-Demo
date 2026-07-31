@@ -6,17 +6,16 @@ triggers database schema generation and initial seed loading, and mounts all the
 sub-routers (Users, Robots, Notifications, Core Platform, and Admin Dashboard).
 """
 
-import os
 import logging
-from pathlib import Path
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request, Depends, HTTPException, status
-from fastapi.responses import HTMLResponse, RedirectResponse
+from pathlib import Path
+
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 
 from app.core import config
-from app.core.database import init_db, get_db
-from app.core.auth import verify_access_token
+from app.core.database import init_db
 
 # Import routers from the distinct monolithic modules
 from app.services.user.router import router as user_router

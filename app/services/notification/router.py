@@ -5,12 +5,13 @@ Provides routes to broadcast new notifications, filter historical alerts by cate
 or robot, and stream raw consolidated log outputs directly from the local log file.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, Depends, Query, status
 from pydantic import BaseModel, Field
 
+from app.core.auth import RBACChecker, get_current_user_from_cookie_or_header
 from app.core.database import MockDatabase, get_nosql_db
-from app.core.auth import get_current_user_from_cookie_or_header, RBACChecker
 from app.services.notification import service as notification_service
 
 router = APIRouter(prefix="/api/notifications", tags=["Notification Service"])

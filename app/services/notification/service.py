@@ -82,7 +82,8 @@ def query_notifications(
         query_filter["robot_id"] = robot_id
         
     cursor = db["notifications"].find(query_filter)
-    results = sorted(cursor._data, key=lambda x: x.get("timestamp", ""), reverse=True)
+    notifications = [notification for notification in cursor]
+    results = sorted(notifications, key=lambda x: x.get("timestamp", ""), reverse=True)
     return results[:limit]
 
 

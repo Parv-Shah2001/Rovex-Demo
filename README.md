@@ -12,7 +12,7 @@ Welcome to the **Rovex Fleet Orchestration Backend**. This prototype is designed
    - **Relational SQL Database (SQLite in-memory)**: Emulates a transactional PostgreSQL OLTP system using genuine, production-standard **SQLAlchemy ORM** configurations for users, roles, and scheduled task records.
    - **Document NoSQL Database (Custom PyMongo Mock)**: A thread-safe, in-memory collection-based document database emulating MongoDB/PyMongo. Stores and queries flexible unstructured robot profiles, history log pools, and system alerts.
 4. **Lightweight HMAC-SHA256 Token Sessions**: Cryptographically signed access credentials with zero external OAuth library bloat, ensuring maximum system independence and speed.
-5. **Tailwind CSS & Canvas JS Frontend**: Serves interactive, responsive administrative panels and an AI chat workspace with zero node/npm dependency overhead. The Core Platform shell also uses a small amount of custom CSS to guarantee a fixed left sidebar and predictable dual-panel desktop layout without introducing a frontend build step.
+5. **Tailwind CSS & Canvas JS Frontend**: Serves interactive, responsive administrative panels and an AI chat workspace with zero node/npm dependency overhead. The Core Platform shell also uses a small amount of custom CSS to guarantee a sticky, collapsible Gemini-style sidebar and a fully scrollable main workspace without introducing a frontend build step.
 
 ---
 

@@ -10,7 +10,7 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime
 
 from app.core.database import MockDatabase
-from app.services.robot.schemas import RobotTelemetryPayload, RobotResponse
+from app.services.robot.schemas import RobotTelemetryPayload
 
 logger = logging.getLogger("rovex.robot_service")
 
@@ -20,7 +20,7 @@ def get_all_robots(db: MockDatabase) -> List[Dict[str, Any]]:
     Retrieves all robot document records from NoSQL database.
     """
     cursor = db["robots"].find({})
-    return [doc for doc in cursor]
+    return sorted([doc for doc in cursor], key=lambda doc: doc["robot_id"])
 
 
 def get_robots_by_organization(db: MockDatabase, organization: str) -> List[Dict[str, Any]]:
@@ -28,7 +28,7 @@ def get_robots_by_organization(db: MockDatabase, organization: str) -> List[Dict
     Returns only the robot devices belonging to a specific hospital/institution.
     """
     cursor = db["robots"].find({"organization": organization})
-    return [doc for doc in cursor]
+    return sorted([doc for doc in cursor], key=lambda doc: doc["robot_id"])
 
 
 def get_robot_by_id(db: MockDatabase, robot_id: str) -> Optional[Dict[str, Any]]:
@@ -157,6 +157,6 @@ def get_recent_telemetry(db: MockDatabase, robot_id: str, limit: int = 15) -> Li
     Sorted in descending chronological order.
     """
     cursor = db["telemetry"].find({"robot_id": robot_id})
-    # Since our cursor is basic, we sort and limit manually
-    results = sorted(cursor._data, key=lambda x: x.get("timestamp", ""), reverse=True)
+    telemetry_records = [record for record in cursor]
+    results = sorted(telemetry_records, key=lambda x: x.get("timestamp", ""), reverse=True)
     return results[:limit]

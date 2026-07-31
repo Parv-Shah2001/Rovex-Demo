@@ -16,19 +16,14 @@ import hashlib
 import base64
 import time
 import logging
-from typing import List, Dict, Any, Optional
+from typing import Iterable, List, Dict, Any, Optional
 from fastapi import Request, Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
-from app.core.config import SECRET_KEY
+from app.core.config import SECRET_KEY, ROLE_INHERITANCE, ROVEX_ORGANIZATION, VALID_ROLES
 from app.core.database import get_db, UserSQL
 
 logger = logging.getLogger("rovex.auth")
-
-# Bearer scheme helper
-security_scheme = HTTPBearer(auto_error=False)
-
 
 def create_access_token(username: str, role: str, organization: str, expires_in_seconds: int = 7200) -> str:
     """
@@ -79,6 +74,10 @@ def verify_access_token(token: str) -> Optional[Dict[str, Any]]:
         
         if time.time() > expiration:
             logger.warning(f"Token expired for user: {username}")
+            return None
+
+        if role not in VALID_ROLES:
+            logger.warning(f"Token for user '{username}' contained unsupported role '{role}'.")
             return None
             
         return {
@@ -147,9 +146,42 @@ def get_current_user_from_cookie_or_header(request: Request, db: Session = Depen
 def is_admin(user: Dict[str, Any]) -> bool:
     """
     Checks whether the given user dictionary represents a Rovex admin.
-    Admins belong to Rovex Robotics and have platform-wide cross-organization access.
+
+    The explicit organization check protects future refactors from accidentally
+    granting global access to any hospital-scoped user record mislabeled as admin.
     """
-    return user.get("role") == "admin"
+    return user.get("role") == "admin" and user.get("organization") == ROVEX_ORGANIZATION
+
+
+def role_allows_access(user_role: str, allowed_roles: Iterable[str]) -> bool:
+    """
+    Resolves whether a concrete role satisfies a route requirement.
+
+    The helper centralizes the role-inheritance policy so routers and services do
+    not need to duplicate privilege expansion logic whenever modular boundaries
+    evolve over time.
+    """
+    inherited_roles = ROLE_INHERITANCE.get(user_role, ())
+    return any(role in inherited_roles for role in allowed_roles)
+
+
+def can_access_organization(user: Dict[str, Any], organization: str) -> bool:
+    """
+    Returns True when the current user may inspect or mutate organization-scoped
+    resources for the supplied organization.
+    """
+    return is_admin(user) or user.get("organization") == organization
+
+
+def ensure_organization_access(user: Dict[str, Any], organization: str, detail: str) -> None:
+    """
+    Raises HTTP 403 when a user attempts to access another hospital's data.
+
+    The explicit helper keeps organization scoping rules in the shared core layer
+    instead of scattering near-duplicate checks across multiple service routers.
+    """
+    if not can_access_organization(user, organization):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=detail)
 
 
 class RBACChecker:
@@ -183,25 +215,16 @@ class RBACChecker:
         is not within the allowed_roles list or the hierarchy.
         """
         user_role = current_user["role"]
-        
-        # Admin override — Rovex admins have unrestricted platform-wide access
-        if user_role == "admin":
+
+        if role_allows_access(user_role, self.allowed_roles):
             return current_user
-            
-        # Supervisor override — supervisors inherit all sub-supervisor and employee permissions
-        if user_role == "supervisor":
-            # Supervisor can access any endpoint that allows supervisor, sub-supervisor, or employee
-            if "supervisor" in self.allowed_roles or "sub-supervisor" in self.allowed_roles or "employee" in self.allowed_roles:
-                return current_user
-            
-        if user_role in self.allowed_roles:
-            return current_user
-            
-        # Sub-supervisor hierarchical override: inherits employee permissions
-        if user_role == "sub-supervisor" and "employee" in self.allowed_roles:
-            return current_user
-            
-        logger.warning(f"User {current_user['username']} with role '{user_role}' denied access to resource requiring {self.allowed_roles}")
+
+        logger.warning(
+            "User %s with role '%s' denied access to resource requiring %s",
+            current_user["username"],
+            user_role,
+            self.allowed_roles,
+        )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Access denied. This action requires one of these roles: {self.allowed_roles}. Your current role is: '{user_role}'"

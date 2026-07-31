@@ -4,16 +4,22 @@ Description: Defines the validation schemas for user interactions in the Rovex C
 Validates scheduled transit assignments, recurrence controls, coordinate nodes, and service requests.
 """
 
-from pydantic import BaseModel, Field
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class TaskCreatePayload(BaseModel):
     """
     Schema for scheduling a new robot transport task.
+
+    Hospital-scoped users submit tasks inside their own organization automatically.
+    Rovex admins may optionally provide an organization when dispatching on behalf
+    of a specific hospital without pre-selecting a robot.
     """
     robot_id: Optional[str] = Field(None, description="Target robot ID. If omitted, the system auto-assigns an idle robot.")
+    organization: Optional[str] = Field(None, description="Optional hospital organization override for Rovex admins.")
     source_node: str = Field(..., description="Starting node in the hospital layout (e.g. 'Reception')")
     target_node: str = Field(..., description="Target node in the hospital layout (e.g. 'ICU')")
     scheduled_time: str = Field("now", description="Time of execution. Enter 'now' for immediate dispatch, or HH:MM for scheduling.")
@@ -39,8 +45,7 @@ class TaskResponse(BaseModel):
     eta_minutes: float
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ServiceRequestPayload(BaseModel):

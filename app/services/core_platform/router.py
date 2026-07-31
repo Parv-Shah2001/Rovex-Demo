@@ -11,22 +11,73 @@ and alert streaming.
 """
 
 import json
-import uuid
 import logging
+import uuid
 from datetime import datetime
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.core.database import get_db, get_nosql_db, MockDatabase, TaskSQL
-from app.core.auth import get_current_user_from_cookie_or_header, RBACChecker, is_admin
-from app.services.robot import service as robot_service
-from app.services.robot.astar import plan_astar_path, hospital_map
+from app.core.auth import (
+    RBACChecker,
+    ensure_organization_access,
+    get_current_user_from_cookie_or_header,
+    is_admin,
+)
+from app.core.database import MockDatabase, TaskSQL, get_db, get_nosql_db
+from app.services.core_platform.schemas import ServiceRequestPayload, TaskCreatePayload, TaskResponse
 from app.services.notification import service as notification_service
-from app.services.core_platform.schemas import TaskCreatePayload, TaskResponse, ServiceRequestPayload
+from app.services.robot import service as robot_service
+from app.services.robot.astar import hospital_map, plan_astar_path
+from app.services.robot.schemas import RobotTelemetryPayload
 
 router = APIRouter(prefix="/api/tasks", tags=["Core Platform Services"])
 logger = logging.getLogger("rovex.core_platform_router")
+
+
+def _get_task_or_404(db_sql: Session, task_id: str) -> TaskSQL:
+    """
+    Resolves a task record or raises a consistent HTTP 404 response.
+    """
+    task = db_sql.query(TaskSQL).filter(TaskSQL.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found.")
+    return task
+
+
+def _get_eligible_robots(robots: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Filters robots down to dispatchable candidates and orders them by battery level.
+    """
+    eligible = [
+        robot for robot in robots
+        if robot["sanctioned"] and robot["status"] == "idle" and robot["battery"] > 20.0
+    ]
+    return sorted(eligible, key=lambda robot: robot["battery"], reverse=True)
+
+
+def _resolve_target_organization(
+    payload: TaskCreatePayload,
+    current_user: Dict[str, Any],
+    target_robot: Optional[Dict[str, Any]],
+) -> Optional[str]:
+    """
+    Resolves which hospital organization should own a task before persistence.
+
+    This keeps task ownership aligned with the actual hospital fleet instead of
+    accidentally assigning hospital work to the Rovex admin organization.
+    """
+    if not is_admin(current_user):
+        return current_user["organization"]
+
+    if payload.organization:
+        return payload.organization.strip()
+
+    if target_robot:
+        return target_robot["organization"]
+
+    return None
 
 
 @router.post("", response_model=TaskResponse, status_code=status.HTTP_201_CREATED)
@@ -38,78 +89,98 @@ def schedule_transit_task(
 ):
     """
     Schedules a new stretcher transport assignment from source to destination.
-    Utilizes A* navigation to plan optimal routes and compute initial ETAs.
-    Saves the task in the relational OLTP database and triggers dispatcher alerts.
-    Admins can also schedule tasks via the RBAC hierarchy.
+
+    The task is persisted under the hospital organization that will actually own
+    the mission. This prevents cross-cutting admin workflows from leaking Rovex's
+    platform organization into hospital task records.
     """
-    # 1. Validate hospital layout nodes
     nodes = hospital_map.get_nodes()
     if payload.source_node not in nodes:
-         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Source node '{payload.source_node}' does not exist.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Source node '{payload.source_node}' does not exist.")
     if payload.target_node not in nodes:
-         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Target node '{payload.target_node}' does not exist.")
-         
-    # 2. Plan path using A*
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Target node '{payload.target_node}' does not exist.")
+
     route_details = plan_astar_path(payload.source_node, payload.target_node)
     if not route_details:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"No viable path exists between '{payload.source_node}' and '{payload.target_node}'."
         )
-        
-    path_nodes = route_details["path"]
-    total_cost = route_details["total_cost"]
-    
-    # Simple simulated ETA calculation (e.g., 0.5 minutes per cost unit)
-    calculated_eta = round(total_cost * 0.5, 1)
-    
-    target_robot_id = payload.robot_id
-    
-    # 3. Handle robot assignments
-    if target_robot_id:
-        # User specified a specific robot
-        robot = robot_service.get_robot_by_id(db_nosql, target_robot_id)
-        if not robot:
-             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Robot '{target_robot_id}' does not exist.")
-        # Hospital staff cannot assign robots from other organizations; admins can assign any
-        if not is_admin(current_user) and robot["organization"] != current_user["organization"]:
-             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This robot belongs to another institution.")
-        if not robot["sanctioned"]:
-             raise HTTPException(
-                 status_code=status.HTTP_400_BAD_REQUEST, 
-                 detail=f"Robot '{target_robot_id}' is un-sanctioned and cannot take on assignments."
-             )
-        if robot["status"] == "error":
-             raise HTTPException(
-                 status_code=status.HTTP_400_BAD_REQUEST, 
-                 detail=f"Robot '{target_robot_id}' is in error state and requires servicing."
-             )
-    else:
-        # Automatic robot assignment — search within the user's organization
-        # (admins see all robots but auto-assign from the first matching org with available bots)
-        search_org = current_user["organization"]
-        available_robots = robot_service.get_robots_by_organization(db_nosql, search_org)
-        eligible = [
-            r for r in available_robots 
-            if r["sanctioned"] and r["status"] == "idle" and r["battery"] > 20.0
-        ]
-        
-        if eligible:
-            # Sort by battery level descending
-            eligible_sorted = sorted(eligible, key=lambda x: x["battery"], reverse=True)
-            target_robot_id = eligible_sorted[0]["robot_id"]
-            logger.info(f"Auto-assigned robot '{target_robot_id}' for new task.")
-        else:
-            # Keep task as pending without assigned robot for now
-            target_robot_id = None
-            logger.info("No idle robots available. Task will remain in 'pending' status.")
 
-    # 4. Save Task to SQL OLTP DB
+    path_nodes = route_details["path"]
+    calculated_eta = round(route_details["total_cost"] * 0.5, 1)
+
+    target_robot: Optional[Dict[str, Any]] = None
+    target_robot_id = payload.robot_id
+    task_organization: Optional[str] = None
+
+    if target_robot_id:
+        target_robot = robot_service.get_robot_by_id(db_nosql, target_robot_id)
+        if not target_robot:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Robot '{target_robot_id}' does not exist.")
+
+        ensure_organization_access(
+            current_user,
+            target_robot["organization"],
+            detail="This robot belongs to another institution.",
+        )
+
+        if payload.organization and payload.organization.strip() != target_robot["organization"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="The provided organization does not match the selected robot's organization.",
+            )
+        if not target_robot["sanctioned"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Robot '{target_robot_id}' is un-sanctioned and cannot take on assignments."
+            )
+        if target_robot["status"] != "idle":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Robot '{target_robot_id}' is currently '{target_robot['status']}' and cannot be assigned to a new mission."
+            )
+
+        task_organization = _resolve_target_organization(payload, current_user, target_robot)
+    else:
+        task_organization = _resolve_target_organization(payload, current_user, None)
+        available_robots = (
+            robot_service.get_all_robots(db_nosql)
+            if is_admin(current_user) and not task_organization
+            else robot_service.get_robots_by_organization(db_nosql, task_organization or current_user["organization"])
+        )
+        if is_admin(current_user) and task_organization and not available_robots:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"No robots are registered under organization '{task_organization}'.",
+            )
+        eligible_robots = _get_eligible_robots(available_robots)
+
+        if eligible_robots:
+            target_robot = eligible_robots[0]
+            target_robot_id = target_robot["robot_id"]
+            task_organization = target_robot["organization"]
+            logger.info("Auto-assigned robot '%s' for new task.", target_robot_id)
+        else:
+            target_robot_id = None
+            if not task_organization:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Rovex admins must specify a hospital organization or robot when queuing a task without an immediately available fleet robot.",
+                )
+            logger.info("No idle robots available. Task will remain in 'pending' status for organization '%s'.", task_organization)
+
+    if not task_organization:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Could not resolve which hospital organization should own this task.",
+        )
+
     task_id = f"task-{uuid.uuid4().hex[:6]}"
     db_task = TaskSQL(
         id=task_id,
         robot_id=target_robot_id,
-        organization=current_user["organization"],
+        organization=task_organization,
         created_by=current_user["username"],
         status="ongoing" if target_robot_id else "pending",
         source_node=payload.source_node,
@@ -120,12 +191,11 @@ def schedule_transit_task(
         recurrence_interval=payload.recurrence_interval,
         eta_minutes=calculated_eta
     )
-    
+
     db_sql.add(db_task)
     db_sql.commit()
     db_sql.refresh(db_task)
-    
-    # 5. Lock robot status in NoSQL
+
     if target_robot_id:
         start_coord = nodes[payload.source_node]
         robot_service.update_robot_status_and_location(
@@ -137,8 +207,7 @@ def schedule_transit_task(
             y_m=start_coord["y"],
             assigned_task_id=task_id
         )
-        
-        # Log notification
+
         notification_service.log_system_notification(
             db=db_nosql,
             robot_id=target_robot_id,
@@ -146,14 +215,13 @@ def schedule_transit_task(
             category="GENERAL"
         )
     else:
-        # Log a generic warning notification
         notification_service.log_system_notification(
             db=db_nosql,
             robot_id="FLEET",
-            message=f"Task '{task_id}' queued in PENDING status. No idle robots available in network.",
+            message=f"Task '{task_id}' queued in PENDING status for {task_organization}. No idle robots available in network.",
             category="SUGGESTIONS"
         )
-        
+
     return db_task
 
 
@@ -167,9 +235,10 @@ def list_tasks(
     - Rovex admins see ALL tasks across every organization.
     - Hospital staff see only tasks within their own organization.
     """
+    query = db_sql.query(TaskSQL).order_by(TaskSQL.created_at.desc())
     if is_admin(current_user):
-        return db_sql.query(TaskSQL).all()
-    return db_sql.query(TaskSQL).filter(TaskSQL.organization == current_user["organization"]).all()
+        return query.all()
+    return query.filter(TaskSQL.organization == current_user["organization"]).all()
 
 
 @router.post("/{task_id}/execute", response_model=TaskResponse)
@@ -185,22 +254,17 @@ def execute_and_simulate_transit(
     and goal completion) and modifies live coordinates in the NoSQL database.
     Admins can also execute tasks via the RBAC hierarchy.
     """
-    task = db_sql.query(TaskSQL).filter(TaskSQL.id == task_id).first()
-    if not task:
-         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found.")
-         
-    # Hospital staff can only execute tasks within their own organization
-    if not is_admin(current_user) and task.organization != current_user["organization"]:
-         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access Denied.")
-         
+    task = _get_task_or_404(db_sql, task_id)
+    ensure_organization_access(current_user, task.organization, detail="Access denied.")
+
     # If pending, try to assign an idle robot
     if task.status == "pending" and not task.robot_id:
         available_robots = robot_service.get_robots_by_organization(db_nosql, task.organization)
-        eligible = [r for r in available_robots if r["sanctioned"] and r["status"] == "idle"]
+        eligible = _get_eligible_robots(available_robots)
         if not eligible:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Cannot execute task yet. All fleet robots are currently active or charging."
+                detail="Cannot execute task yet. All fleet robots are currently active, charging, unavailable, or below the safe battery threshold."
             )
         task.robot_id = eligible[0]["robot_id"]
         task.status = "ongoing"
@@ -269,7 +333,6 @@ def execute_and_simulate_transit(
             }
         }
         
-        from app.services.robot.schemas import RobotTelemetryPayload
         telemetry_validated = RobotTelemetryPayload(**synthetic_telemetry)
         robot_service.ingest_robot_telemetry(db_nosql, telemetry_validated)
         
@@ -316,14 +379,9 @@ def cancel_transit_task(
     Cancels an active or scheduled transit task. Clears assignments and reverts robot states.
     Admins can also cancel tasks via the RBAC hierarchy.
     """
-    task = db_sql.query(TaskSQL).filter(TaskSQL.id == task_id).first()
-    if not task:
-         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found.")
-         
-    # Hospital staff can only cancel tasks within their own organization
-    if not is_admin(current_user) and task.organization != current_user["organization"]:
-         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access Denied.")
-         
+    task = _get_task_or_404(db_sql, task_id)
+    ensure_organization_access(current_user, task.organization, detail="Access denied.")
+
     if task.status in ["completed", "cancelled"]:
          raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Cannot cancel a task that is already '{task.status}'.")
          
@@ -371,14 +429,13 @@ def submit_robot_service_request(
     robot = robot_service.get_robot_by_id(db_nosql, payload.robot_id)
     if not robot:
          raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Robot not found.")
-         
-    if not is_admin(current_user) and robot["organization"] != current_user["organization"]:
-         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access Denied.")
-         
+
+    ensure_organization_access(current_user, robot["organization"], detail="Access denied.")
+
     # Update last problem on robot profile
     db_nosql["robots"].update_one(
         {"robot_id": payload.robot_id},
-        {"$set": {"last_problem": payload.issue_description, "status": "error"}}
+        {"$set": {"last_problem": payload.issue_description, "status": "error", "assigned_task_id": None}}
     )
     
     # Broadcast critical alert

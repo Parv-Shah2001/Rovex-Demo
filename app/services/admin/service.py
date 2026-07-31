@@ -7,14 +7,15 @@ SQLAlchemy/SQLite engine, and parses PyMongo-like string queries (e.g., 'db.robo
 to execute operations against the Mock PyMongo client.
 """
 
-import re
 import json
 import logging
-from typing import List, Dict, Any, Optional
+import re
+from typing import Any, Dict, List
+
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.core.database import MockDatabase, nosql_db
+from app.core.database import MockDatabase
 
 logger = logging.getLogger("rovex.admin_service")
 
@@ -106,7 +107,7 @@ def get_admin_dashboard_stats(db_sql: Session, db_nosql: MockDatabase) -> Dict[s
         pending_tasks = db_sql.query(TaskSQL).filter(TaskSQL.status == "pending").count()
         completed_tasks = db_sql.query(TaskSQL).filter(TaskSQL.status == "completed").count()
         
-        robots = db_nosql["robots"].find({})._data
+        robots = [robot for robot in db_nosql["robots"].find({})]
         robot_count = len(robots)
         online_robots = sum(1 for r in robots if r.get("status") in ["idle", "transit", "charging"] and r.get("sanctioned") is True)
         un_sanctioned_count = sum(1 for r in robots if r.get("sanctioned") is False)

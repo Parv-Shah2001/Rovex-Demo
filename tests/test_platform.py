@@ -19,13 +19,18 @@ from sqlalchemy.orm import Session
 
 from app.core import config
 from app.core.auth import create_access_token, verify_access_token, is_admin
-from app.core.database import SessionLocal, Base, engine, init_db, nosql_db
+from app.core.database import SessionLocal, TaskSQL, Base, engine, init_db, nosql_db
 from app.services.user import service as user_service
 from app.services.user.schemas import UserCreate
 from app.services.robot import service as robot_service
 from app.services.robot.schemas import RobotTelemetryPayload
 from app.services.robot.astar import plan_astar_path, hospital_map
 from app.services.notification import service as notification_service
+<<<<<<< HEAD
+=======
+from app.services.core_platform.router import schedule_transit_task
+from app.services.core_platform.schemas import TaskCreatePayload
+>>>>>>> 8c20d0d (Harden modular architecture and core platform flows)
 from app.main import (
     serve_core_platform_page,
     serve_index_page,
@@ -290,6 +295,40 @@ class TestRovexPlatform(unittest.TestCase):
         self.assertIn("rovi-03", live_logs)
         self.assertIn("CRITICAL", live_logs)
         self.assertIn("collision safety trigger", live_logs.lower())
+
+    def test_admin_scheduled_tasks_resolve_to_hospital_organization(self):
+        """
+        Verifies Rovex admins do not accidentally create tasks inside the Rovex
+        organization namespace when dispatching hospital work without explicitly
+        choosing a target robot first.
+        """
+        admin_user = {
+            "username": "rovex_admin",
+            "role": "admin",
+            "organization": config.ROVEX_ORGANIZATION,
+            "full_name": "James Whitfield",
+        }
+        payload = TaskCreatePayload(source_node="Reception", target_node="ICU")
+
+        task = schedule_transit_task(payload, admin_user, self.db_sql, nosql_db)
+        assigned_robot = robot_service.get_robot_by_id(nosql_db, task.robot_id)
+
+        self.assertIsNotNone(task.robot_id)
+        self.assertIsNotNone(assigned_robot)
+        self.assertEqual(task.organization, assigned_robot["organization"])
+        self.assertNotEqual(task.organization, config.ROVEX_ORGANIZATION)
+
+        self.db_sql.query(TaskSQL).filter(TaskSQL.id == task.id).delete()
+        self.db_sql.commit()
+        robot_service.update_robot_status_and_location(
+            db=nosql_db,
+            robot_id=task.robot_id,
+            status="idle",
+            location="Reception",
+            x_m=0.0,
+            y_m=0.0,
+            assigned_task_id=None,
+        )
 
     def test_core_platform_template_uses_desktop_shell_layout(self):
         """

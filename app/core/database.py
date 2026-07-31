@@ -13,9 +13,10 @@ import datetime
 import json
 import logging
 import threading
-from typing import Dict, Any, List, Optional, Union, Generator
-from sqlalchemy import create_engine, Column, Integer, String, Boolean, Float, DateTime, ForeignKey, text
-from sqlalchemy.orm import declarative_base, sessionmaker, Session
+from typing import Any, Dict, Generator, List, Optional
+
+from sqlalchemy import Boolean, Column, DateTime, Float, Integer, String, create_engine
+from sqlalchemy.orm import Session, declarative_base, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.core.config import SEED_USERS, SEED_ROBOTS, LOG_FILE_PATH
@@ -409,8 +410,8 @@ def init_db():
             robot_collection.insert_one(r)
         logger.info(f"Successfully seeded {len(SEED_ROBOTS)} robots in Mock PyMongo.")
 
-    # 4. Seed empty telemetry collection
-    telemetry_collection = nosql_db["telemetry"]
+    # 4. Ensure telemetry collection exists
+    nosql_db["telemetry"]
     logger.info("Telemetry and log collections ready.")
 
     # 5. Create empty log file if not exists

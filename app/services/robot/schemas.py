@@ -5,9 +5,10 @@ the Rovex hospital robots. Validates concurrent incoming sensor, speed, battery,
 and health payloads (synthetic robot telemetries) as well as administrative robot profiles.
 """
 
-from pydantic import BaseModel, Field
 from datetime import datetime
-from typing import Optional, List, Dict, Any
+from typing import Optional
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 # =====================================================================

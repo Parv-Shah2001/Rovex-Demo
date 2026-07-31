@@ -4,9 +4,9 @@ Description: Defines the Pydantic data schemas for validating user management re
 including authentication payloads, user registration data, role configurations, and profiles.
 """
 
-from pydantic import BaseModel, EmailStr, Field
 from datetime import datetime
-from typing import Optional
+
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 class UserLoginRequest(BaseModel):
     """
@@ -21,7 +21,7 @@ class UserCreate(BaseModel):
     Schema for creating a new user within the database.
     """
     username: str = Field(..., min_length=3, max_length=50, description="Unique username for the login credentials")
-    password: str = Field(..., min_length=6, description="User password (will be stored securely)")
+    password: str = Field(..., min_length=6, description="User password used for demo authentication flows")
     role: str = Field(..., description="RBAC Role: 'admin', 'supervisor', 'sub-supervisor', or 'employee'")
     organization: str = Field(..., description="The hospital/institution organization name (e.g., 'St. Jude Hospital')")
     full_name: str = Field(..., description="Full name of the staff member")
@@ -41,8 +41,7 @@ class UserResponse(BaseModel):
     email: str
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class RoleUpdatePayload(BaseModel):

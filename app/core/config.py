@@ -6,12 +6,22 @@ hospital layouts, and path graph nodes/edges) that are utilized across the modul
 """
 
 import os
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Tuple
 
 # Security Configuration
 SECRET_KEY = os.getenv("SECRET_KEY", "rovex_super_secret_interview_key_2026")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 120
+
+# RBAC / Organization Configuration
+ROVEX_ORGANIZATION = "Rovex Robotics Inc."
+VALID_ROLES: Tuple[str, ...] = ("admin", "supervisor", "sub-supervisor", "employee")
+ROLE_INHERITANCE: Dict[str, Tuple[str, ...]] = {
+    "admin": VALID_ROLES,
+    "supervisor": ("supervisor", "sub-supervisor", "employee"),
+    "sub-supervisor": ("sub-supervisor", "employee"),
+    "employee": ("employee",),
+}
 
 # Logger Configuration
 LOG_FILE_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data_pool_notifications.log")
@@ -66,7 +76,7 @@ SEED_USERS = [
         "username": "rovex_admin",
         "password": "rovexadminpassword",
         "role": "admin",
-        "organization": "Rovex Robotics Inc.",
+        "organization": ROVEX_ORGANIZATION,
         "full_name": "James Whitfield",
         "email": "j.whitfield@rovexrobotics.com"
     },
@@ -178,6 +188,8 @@ def get_config_summary() -> Dict[str, Any]:
         "secret_key_configured": len(SECRET_KEY) > 0,
         "algorithm": ALGORITHM,
         "token_expire_minutes": ACCESS_TOKEN_EXPIRE_MINUTES,
+        "rovex_organization": ROVEX_ORGANIZATION,
+        "valid_roles": list(VALID_ROLES),
         "log_path": LOG_FILE_PATH,
         "seed_users_count": len(SEED_USERS),
         "seed_robots_count": len(SEED_ROBOTS)

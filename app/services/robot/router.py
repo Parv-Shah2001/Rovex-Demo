@@ -10,11 +10,16 @@ Organization scoping:
     belonging to their own organization.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from typing import List, Dict, Any, Optional
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from typing import List, Dict, Any
 
 from app.core.database import MockDatabase, get_nosql_db
-from app.core.auth import get_current_user_from_cookie_or_header, RBACChecker, is_admin
+from app.core.auth import (
+    RBACChecker,
+    ensure_organization_access,
+    get_current_user_from_cookie_or_header,
+    is_admin,
+)
 from app.services.robot.schemas import (
     RobotTelemetryPayload, 
     RobotResponse, 
@@ -26,6 +31,19 @@ from app.services.robot import service as robot_service
 from app.services.robot import astar
 
 router = APIRouter(prefix="/api/robots", tags=["Robot Management"])
+
+
+def _get_robot_or_404(db: MockDatabase, robot_id: str) -> Dict[str, Any]:
+    """
+    Resolves a robot profile or raises a consistent HTTP 404 response.
+    """
+    robot = robot_service.get_robot_by_id(db, robot_id)
+    if not robot:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Robot with ID '{robot_id}' was not found."
+        )
+    return robot
 
 
 @router.post("/telemetry", response_model=Dict[str, Any], status_code=status.HTTP_201_CREATED)
@@ -123,19 +141,12 @@ def get_robot_profile(
     - Rovex admins can view any robot regardless of organization.
     - Hospital staff can only view robots belonging to their own organization.
     """
-    robot = robot_service.get_robot_by_id(db, robot_id)
-    if not robot:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Robot with ID '{robot_id}' was not found."
-        )
-        
-    # Security: hospital staff cannot view robots from other organizations
-    if not is_admin(current_user) and robot["organization"] != current_user["organization"]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access Denied. This robot belongs to another institution."
-        )
+    robot = _get_robot_or_404(db, robot_id)
+    ensure_organization_access(
+        current_user,
+        robot["organization"],
+        detail="Access denied. This robot belongs to another institution.",
+    )
     return robot
 
 
@@ -151,13 +162,7 @@ def modify_robot_sanction_status(
     Un-sanctioned robots cannot accept transport tasks.
     This is a platform-level action restricted to Rovex staff only.
     """
-    robot = robot_service.get_robot_by_id(db, robot_id)
-    if not robot:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Robot with ID '{robot_id}' was not found."
-        )
-        
+    _get_robot_or_404(db, robot_id)
     updated_robot = robot_service.update_robot_sanction(db, robot_id, payload.sanctioned)
     return updated_robot
 
