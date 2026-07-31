@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 
 from app.core import config
 from app.core.auth import create_access_token, verify_access_token, is_admin
-from app.core.database import SessionLocal, TaskSQL, Base, engine, init_db, nosql_db
+from app.core.database import MockCollection, SessionLocal, TaskSQL, Base, engine, init_db, nosql_db
 from app.services.user import service as user_service
 from app.services.user.schemas import UserCreate
 from app.services.robot import service as robot_service
@@ -236,6 +236,23 @@ class TestRovexPlatform(unittest.TestCase):
                 ),
                 supervisor_actor,
             )
+
+    def test_mock_nosql_reads_return_defensive_copies(self):
+        """
+        Verifies mock NoSQL reads do not expose mutable references to stored
+        documents, which keeps the infrastructure layer closer to real driver
+        behavior and prevents accidental shared-state bugs.
+        """
+        collection = MockCollection("defensive-copy-check")
+        source = {"robot_id": "copy-test", "meta": {"battery": 90}}
+        collection.insert_one(source)
+
+        found = collection.find_one({"robot_id": "copy-test"})
+        found["meta"]["battery"] = 10
+        source["meta"]["battery"] = 5
+
+        reloaded = collection.find_one({"robot_id": "copy-test"})
+        self.assertEqual(reloaded["meta"]["battery"], 90)
 
 
     # =====================================================================
@@ -559,6 +576,22 @@ class TestRovexPlatform(unittest.TestCase):
             self.assertEqual(route_response.status_code, 200)
             for header_name, header_value in HTML_NO_CACHE_HEADERS.items():
                 self.assertEqual(route_response.headers.get(header_name), header_value)
+
+    def test_templates_reference_external_frontend_bundles(self):
+        """
+        Verifies the dashboard templates now load shared/static JavaScript bundles
+        instead of embedding all frontend logic inline.
+        """
+        index_html = serve_index_page(None).body.decode("utf-8")
+        admin_html = serve_admin_platform_page(None).body.decode("utf-8")
+        core_html = serve_core_platform_page(None).body.decode("utf-8")
+
+        self.assertIn('/static/js/rovex-common.js', index_html)
+        self.assertIn('/static/js/index.js', index_html)
+        self.assertIn('/static/js/rovex-common.js', admin_html)
+        self.assertIn('/static/js/admin.js', admin_html)
+        self.assertIn('/static/js/rovex-common.js', core_html)
+        self.assertIn('/static/js/core_platform.js', core_html)
 
     def test_template_loader_refreshes_changed_html_files(self):
         """

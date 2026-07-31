@@ -189,58 +189,7 @@
         </div>
     </footer>
 
-    <script>
-        // Form submissions
-        document.getElementById('loginForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            const u = document.getElementById('username').value;
-            const p = document.getElementById('password').value;
-            await runLogin(u, p);
-        });
-
-        // Fast helper auto click
-        async function fillAndLogin(username, password) {
-            document.getElementById('username').value = username;
-            document.getElementById('password').value = password;
-            await runLogin(username, password);
-        }
-
-        // Login fetch action
-        async function runLogin(username, password) {
-            const errorBox = document.getElementById('errorBox');
-            errorBox.classList.add('hidden');
-            
-            try {
-                const response = await fetch('/api/users/login', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, password })
-                });
-                
-                const data = await response.json();
-                if (response.ok) {
-                    // Successfully logged in! Re-route based on role
-                    // Save credentials to localStorage
-                    localStorage.setItem('rovex_token', data.access_token);
-                    localStorage.setItem('rovex_user', JSON.stringify(data.user));
-                    
-                    // Redirect to corresponding page based on role:
-                    // Admins go to the admin platform, hospital staff go to the core platform
-                    if (data.user.role === 'admin') {
-                        window.location.href = '/admin';
-                    } else {
-                        window.location.href = '/core';
-                    }
-                } else {
-                    errorBox.classList.remove('hidden');
-                    document.getElementById('errorMessage').innerText = data.detail || 'Failed to authenticate.';
-                }
-            } catch (err) {
-                errorBox.classList.remove('hidden');
-                document.getElementById('errorMessage').innerText = 'Network error contacting backend platform.';
-                console.error(err);
-            }
-        }
-    </script>
+    <script src="/static/js/rovex-common.js"></script>
+    <script src="/static/js/index.js"></script>
 </body>
 </html>

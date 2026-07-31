@@ -13,6 +13,7 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.core import config
 from app.core.database import init_db
@@ -35,6 +36,7 @@ logger = logging.getLogger("rovex.main")
 # This avoids any Jinja2/Starlette cache compatibility issues with newer versions
 # while keeping the frontend rendering simple and dependency-free.
 TEMPLATES_DIR = Path(__file__).parent / "templates"
+STATIC_DIR = Path(__file__).parent / "static"
 
 _html_cache: dict[str, tuple[int, str]] = {}
 HTML_NO_CACHE_HEADERS = {
@@ -67,6 +69,21 @@ def _html_response(name: str) -> HTMLResponse:
     return HTMLResponse(content=_load_template(name), headers=HTML_NO_CACHE_HEADERS)
 
 
+class NoCacheStaticFiles(StaticFiles):
+    """
+    Static files wrapper that disables browser caching for frontend assets.
+
+    During active prototype iteration this ensures updated JavaScript bundles are
+    re-fetched immediately, which keeps the plain-HTML frontend predictable even
+    without a formal asset pipeline.
+    """
+    async def get_response(self, path: str, scope):
+        response = await super().get_response(path, scope)
+        if response.status_code == 200:
+            response.headers.update(HTML_NO_CACHE_HEADERS)
+        return response
+
+
 @asynccontextmanager
 async def lifespan(app_instance: FastAPI):
     """
@@ -85,6 +102,7 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan
 )
+app.mount("/static", NoCacheStaticFiles(directory=STATIC_DIR), name="static")
 
 # Enable CORS for frontend and API accessibility
 app.add_middleware(

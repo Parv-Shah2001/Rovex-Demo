@@ -30,9 +30,11 @@ app/
 │   ├── user/               # User Management Service (SQL, register, login, RBAC shifts)
 │   ├── robot/              # Robot Management Service (NoSQL, A* router, telemetry validation)
 │   ├── notification/       # Notification Service (Alerts, category priority, physical logs)
-│   ├── admin/              # Admin Platform (Dashboard stats, DB queries sandbox, live log terminal)
-│   └── core_platform/      # Core Platform (User scheduling, transit simulation, requests)
-├── templates/              # HTML Frontend Templates (Served natively by FastAPI Jinja2)
+│   ├── admin/              # Admin Platform (router, schemas, dashboard stats, DB query sandbox)
+│   └── core_platform/      # Core Platform (router + service layer for scheduling and mission orchestration)
+├── static/
+│   └── js/                 # Shared/page-specific browser bundles served via FastAPI StaticFiles
+├── templates/              # HTML frontend templates served directly from FastAPI file reads
 │   ├── index.html          # Dynamic login panel & RBAC account credentials card
 │   ├── admin.html          # Sandboxed query browser, log panel, and device sanction controls
 │   └── core_platform.html  # Gemini-style chat portal and live 2D canvas navigation map
@@ -94,7 +96,7 @@ The face-to-face employee workspace is styled with a sleek **Gemini-like AI Chat
    ```bash
    python3 -m unittest -v
    ```
-   *Output showing `OK` confirms that cryptographic, relational, document, routing, file-based template loading, and Core Platform layout checks are all passing.*
+   *Output showing `OK` confirms that cryptographic, relational, document, routing, organization scoping, static frontend bundle wiring, file-based template loading, and Core Platform layout checks are all passing.*
 
 3. **Start the FastAPI Application Server**:
    ```bash

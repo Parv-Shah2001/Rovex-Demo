@@ -8,12 +8,13 @@ all primary CRUD methods (find, find_one, insert_one, update_one, delete_one, ag
 storing documents in an in-memory dictionary.
 """
 
-import os
+import copy
 import datetime
-import json
+import os
 import logging
 import threading
-from typing import Any, Dict, Generator, List, Optional
+from dataclasses import dataclass
+from typing import Any, Dict, Generator, List, Optional, Sequence, Tuple, Union
 
 from sqlalchemy import Boolean, Column, DateTime, Float, Integer, String, create_engine
 from sqlalchemy.orm import Session, declarative_base, sessionmaker
@@ -95,6 +96,35 @@ def get_db() -> Generator[Session, None, None]:
 # 2. NOSQL DATABASE SETUP (Mock PyMongo / Motor Client)
 # =====================================================================
 
+@dataclass
+class MockInsertResult:
+    """
+    Lightweight insert result mirroring the minimal PyMongo contract used by the demo.
+    """
+    inserted_id: str
+    acknowledged: bool = True
+
+
+@dataclass
+class MockUpdateResult:
+    """
+    Lightweight update result for MockCollection write operations.
+    """
+    matched_count: int = 0
+    modified_count: int = 0
+    upserted_id: Optional[str] = None
+    acknowledged: bool = True
+
+
+@dataclass
+class MockDeleteResult:
+    """
+    Lightweight delete result for MockCollection delete operations.
+    """
+    deleted_count: int = 0
+    acknowledged: bool = True
+
+
 class MockCursor:
     """
     Simulates a PyMongo cursor returning documents with limit, skipping, and to_list features.
@@ -123,6 +153,25 @@ class MockCursor:
         self._data = self._data[count:]
         return self
 
+    def sort(self, key_or_list: Union[str, Sequence[Tuple[str, int]]], direction: int = 1) -> 'MockCursor':
+        """
+        Sorts cursor contents using a PyMongo-like interface.
+
+        The method supports either a single key plus direction or a sequence of
+        key/direction tuples, which keeps the mock compatible with incremental
+        router/service refactors.
+        """
+        sort_fields: Sequence[Tuple[str, int]]
+        if isinstance(key_or_list, str):
+            sort_fields = [(key_or_list, direction)]
+        else:
+            sort_fields = list(key_or_list)
+
+        for field_name, field_direction in reversed(sort_fields):
+            reverse = field_direction == -1
+            self._data = sorted(self._data, key=lambda doc: doc.get(field_name), reverse=reverse)
+        return self
+
     async def to_list(self, length: Optional[int] = None) -> List[Dict[str, Any]]:
         """Asynchronously returns cursor results as a list (Motor compatibility)."""
         if length is not None:
@@ -139,18 +188,25 @@ class MockCollection:
         self._documents: List[Dict[str, Any]] = []
         self._lock = threading.Lock()
 
+    @staticmethod
+    def _clone_document(document: Any) -> Any:
+        """
+        Returns a deep copy of a stored document.
+
+        Using copy.deepcopy preserves richer Python types such as datetimes while
+        still protecting the mock storage from accidental external mutation.
+        """
+        return copy.deepcopy(document)
+
     def insert_one(self, document: Dict[str, Any]) -> Any:
         """Inserts a single document. Generates an internal _id if missing."""
         with self._lock:
-            doc_copy = json.loads(json.dumps(document)) # deep copy
+            doc_copy = self._clone_document(document)
             if "_id" not in doc_copy:
                 import uuid
                 doc_copy["_id"] = str(uuid.uuid4())
             self._documents.append(doc_copy)
-            class InsertResult:
-                inserted_id = doc_copy["_id"]
-                acknowledged = True
-            return InsertResult()
+            return MockInsertResult(inserted_id=doc_copy["_id"])
 
     def _match_filter(self, doc: Dict[str, Any], query_filter: Dict[str, Any]) -> bool:
         """Simple evaluator checking matches for query filters."""
@@ -192,7 +248,7 @@ class MockCollection:
             results = []
             for doc in self._documents:
                 if self._match_filter(doc, filter_dict):
-                    results.append(json.loads(json.dumps(doc)))
+                    results.append(self._clone_document(doc))
             return MockCursor(results)
 
     def find_one(self, filter_dict: Optional[Dict[str, Any]] = None, projection: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
@@ -201,7 +257,7 @@ class MockCollection:
         with self._lock:
             for doc in self._documents:
                 if self._match_filter(doc, filter_dict):
-                    return json.loads(json.dumps(doc))
+                    return self._clone_document(doc)
             return None
 
     def update_one(self, filter_dict: Dict[str, Any], update_dict: Dict[str, Any], upsert: bool = False) -> Any:
@@ -213,12 +269,6 @@ class MockCollection:
                     target_doc = doc
                     break
             
-            class UpdateResult:
-                matched_count = 1 if target_doc else 0
-                modified_count = 0
-                upserted_id = None
-                acknowledged = True
-
             if target_doc:
                 # Perform updates (supports $set, $unset, $push)
                 if "$set" in update_dict:
@@ -233,24 +283,18 @@ class MockCollection:
                             target_doc[k] = []
                         if isinstance(target_doc[k], list):
                             target_doc[k].append(v)
-                res = UpdateResult()
-                res.modified_count = 1
-                return res
+                return MockUpdateResult(matched_count=1, modified_count=1)
             elif upsert:
-                new_doc = json.loads(json.dumps(filter_dict))
+                new_doc = self._clone_document(filter_dict)
                 if "$set" in update_dict:
                     for k, v in update_dict["$set"].items():
                         new_doc[k] = v
                 import uuid
                 new_doc["_id"] = str(uuid.uuid4())
                 self._documents.append(new_doc)
-                res = UpdateResult()
-                res.upserted_id = new_doc["_id"]
-                res.matched_count = 0
-                res.modified_count = 1
-                return res
+                return MockUpdateResult(matched_count=0, modified_count=1, upserted_id=new_doc["_id"])
 
-            return UpdateResult()
+            return MockUpdateResult(matched_count=0, modified_count=0)
 
     def delete_one(self, filter_dict: Dict[str, Any]) -> Any:
         """Deletes a single document matching the filter."""
@@ -261,16 +305,10 @@ class MockCollection:
                     index_to_del = idx
                     break
             
-            class DeleteResult:
-                deleted_count = 0
-                acknowledged = True
-
             if index_to_del != -1:
                 self._documents.pop(index_to_del)
-                res = DeleteResult()
-                res.deleted_count = 1
-                return res
-            return DeleteResult()
+                return MockDeleteResult(deleted_count=1)
+            return MockDeleteResult(deleted_count=0)
 
     def count_documents(self, filter_dict: Dict[str, Any]) -> int:
         """Counts how many documents match the filter."""
@@ -295,7 +333,7 @@ class MockCollection:
     def aggregate(self, pipeline: List[Dict[str, Any]]) -> MockCursor:
         """Simulates simple aggregations like $match, $group, $sort, $limit."""
         with self._lock:
-            current_data = json.loads(json.dumps(self._documents))
+            current_data = self._clone_document(self._documents)
             
             for stage in pipeline:
                 if "$match" in stage:
@@ -410,8 +448,9 @@ def init_db():
             robot_collection.insert_one(r)
         logger.info(f"Successfully seeded {len(SEED_ROBOTS)} robots in Mock PyMongo.")
 
-    # 4. Ensure telemetry collection exists
+    # 4. Ensure telemetry and notification collections exist
     nosql_db["telemetry"]
+    nosql_db["notifications"]
     logger.info("Telemetry and log collections ready.")
 
     # 5. Create empty log file if not exists
