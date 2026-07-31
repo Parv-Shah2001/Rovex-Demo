@@ -11,21 +11,78 @@ Dependency Injection checks to enforce the four-tier permission hierarchy:
     employee       — Organization employee who is a viewer and can file service requests.
 """
 
-import hmac
-import hashlib
 import base64
-import time
+import hashlib
+import hmac
+import json
 import logging
-from typing import Iterable, List, Dict, Any, Optional
-from fastapi import Request, Depends, HTTPException, status
+import time
+from typing import Any, Dict, Iterable, List, Optional
+
+from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
-from app.core.config import SECRET_KEY, ROLE_INHERITANCE, ROVEX_ORGANIZATION, VALID_ROLES
-from app.core.database import get_db, UserSQL
+from app.core.config import (
+    ACCESS_TOKEN_EXPIRE_SECONDS,
+    ROLE_INHERITANCE,
+    ROVEX_ORGANIZATION,
+    SECRET_KEY,
+    VALID_ROLES,
+)
+from app.core.database import UserSQL, get_db
 
 logger = logging.getLogger("rovex.auth")
 
-def create_access_token(username: str, role: str, organization: str, expires_in_seconds: int = 7200) -> str:
+
+def _encode_token_payload(payload: Dict[str, Any]) -> str:
+    """
+    Serializes a token payload into base64 text.
+
+    JSON encoding avoids delimiter bugs when organization names or future fields
+    contain reserved characters such as colons.
+    """
+    payload_json = json.dumps(payload, separators=(",", ":"), sort_keys=True)
+    return base64.b64encode(payload_json.encode("utf-8")).decode("utf-8")
+
+
+def _decode_token_payload(payload_b64: str) -> Optional[Dict[str, Any]]:
+    """
+    Decodes a base64 token payload.
+
+    The decoder accepts both the current JSON payload structure and the earlier
+    colon-delimited legacy format so existing browser sessions can continue to
+    function during rolling upgrades.
+    """
+    payload_str = base64.b64decode(payload_b64.encode("utf-8")).decode("utf-8")
+    if payload_str.startswith("{"):
+        return json.loads(payload_str)
+
+    username, role, organization, expiration_str = payload_str.split(":", 3)
+    return {
+        "username": username,
+        "role": role,
+        "organization": organization,
+        "expiration": int(expiration_str),
+    }
+
+
+def extract_bearer_token_from_request(request: Request) -> Optional[str]:
+    """
+    Extracts a bearer token from either the session cookie or Authorization header.
+    """
+    if "access_token" in request.cookies:
+        token = request.cookies["access_token"]
+        if token.startswith("Bearer "):
+            return token[7:]
+        return token
+
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        return auth_header[7:]
+    return None
+
+
+def create_access_token(username: str, role: str, organization: str, expires_in_seconds: int = ACCESS_TOKEN_EXPIRE_SECONDS) -> str:
     """
     Creates a secure, signed token representing the user session.
     
@@ -33,8 +90,14 @@ def create_access_token(username: str, role: str, organization: str, expires_in_
     Payload contains username, role, organization, and expiration timestamp.
     """
     expiration = int(time.time()) + expires_in_seconds
-    payload_str = f"{username}:{role}:{organization}:{expiration}"
-    payload_b64 = base64.b64encode(payload_str.encode("utf-8")).decode("utf-8")
+    payload_b64 = _encode_token_payload(
+        {
+            "username": username,
+            "role": role,
+            "organization": organization,
+            "expiration": expiration,
+        }
+    )
     
     # Compute signature
     sig = hmac.new(
@@ -68,9 +131,14 @@ def verify_access_token(token: str) -> Optional[Dict[str, Any]]:
             return None
             
         # Decode and check expiration
-        payload_str = base64.b64decode(payload_b64.encode("utf-8")).decode("utf-8")
-        username, role, organization, expiration_str = payload_str.split(":", 3)
-        expiration = int(expiration_str)
+        payload = _decode_token_payload(payload_b64)
+        if not payload:
+            return None
+
+        username = payload.get("username")
+        role = payload.get("role")
+        organization = payload.get("organization")
+        expiration = int(payload.get("expiration", 0))
         
         if time.time() > expiration:
             logger.warning(f"Token expired for user: {username}")
@@ -96,20 +164,7 @@ def get_current_user_from_cookie_or_header(request: Request, db: Session = Depen
     It inspects BOTH the standard Authorization Bearer header AND a session cookie 'access_token'.
     This hybrid setup is perfect for supporting API routes AND HTML frontend rendering seamlessly.
     """
-    token = None
-    
-    # 1. Try resolving from cookie (useful for HTML templates and web UI)
-    if "access_token" in request.cookies:
-        token = request.cookies["access_token"]
-        if token.startswith("Bearer "):
-            token = token[7:]
-            
-    # 2. Try resolving from Authorization header (useful for API clients)
-    if not token:
-        auth_header = request.headers.get("Authorization")
-        if auth_header and auth_header.startswith("Bearer "):
-            token = auth_header[7:]
-            
+    token = extract_bearer_token_from_request(request)
     if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

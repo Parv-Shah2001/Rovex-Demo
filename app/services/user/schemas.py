@@ -28,6 +28,26 @@ class UserCreate(BaseModel):
     email: EmailStr = Field(..., description="Valid work email address")
 
 
+class AuthenticatedUserSummary(BaseModel):
+    """
+    Minimal authenticated user payload returned after login.
+    """
+    username: str
+    role: str
+    organization: str
+    full_name: str
+
+
+class LoginResponse(BaseModel):
+    """
+    Canonical login response returned by the authentication endpoint.
+    """
+    status: str
+    access_token: str
+    token_type: str
+    user: AuthenticatedUserSummary
+
+
 class UserResponse(BaseModel):
     """
     Schema representing user profile metadata returned by endpoints.

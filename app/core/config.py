@@ -12,6 +12,7 @@ from typing import Dict, Any, List, Tuple
 SECRET_KEY = os.getenv("SECRET_KEY", "rovex_super_secret_interview_key_2026")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 120
+ACCESS_TOKEN_EXPIRE_SECONDS = ACCESS_TOKEN_EXPIRE_MINUTES * 60
 
 # RBAC / Organization Configuration
 ROVEX_ORGANIZATION = "Rovex Robotics Inc."

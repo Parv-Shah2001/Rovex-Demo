@@ -6,11 +6,12 @@ are written to both a persistent local log file ('data_pool_notifications.log') 
 sensor/lidar processing pipelines, and a NoSQL collection for instant querying in frontend dashboards.
 """
 
-import os
 import datetime
+import os
 import logging
 from typing import List, Dict, Any, Optional
 
+from app.core.auth import is_admin
 from app.core.config import LOG_FILE_PATH
 from app.core.database import MockDatabase
 
@@ -26,11 +27,33 @@ CATEGORY_PRIORITIES = {
 }
 
 
+def resolve_notification_organization(
+    db: MockDatabase,
+    robot_id: str,
+    organization: Optional[str] = None,
+) -> str:
+    """
+    Resolves which organization should own a notification.
+
+    Robot-specific notifications inherit the robot organization automatically.
+    Fleet-level alerts may provide an explicit organization, otherwise they fall
+    back to a platform-level bucket.
+    """
+    if organization:
+        return organization
+
+    robot = db["robots"].find_one({"robot_id": robot_id})
+    if robot:
+        return robot.get("organization", "Platform")
+    return "Platform"
+
+
 def log_system_notification(
     db: MockDatabase, 
     robot_id: str, 
     message: str, 
-    category: str = "GENERAL"
+    category: str = "GENERAL",
+    organization: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Creates and logs a system notification with respect to a particular robot.
@@ -38,6 +61,7 @@ def log_system_notification(
     """
     category_upper = category.upper()
     priority = CATEGORY_PRIORITIES.get(category_upper, 3) # default to medium priority (3)
+    resolved_organization = resolve_notification_organization(db, robot_id, organization)
     
     timestamp = datetime.datetime.utcnow().isoformat() + "Z"
     
@@ -45,6 +69,7 @@ def log_system_notification(
     notification_doc = {
         "timestamp": timestamp,
         "robot_id": robot_id,
+        "organization": resolved_organization,
         "category": category_upper,
         "priority": priority,
         "message": message
@@ -69,7 +94,8 @@ def log_system_notification(
 def query_notifications(
     db: MockDatabase, 
     category: Optional[str] = None, 
-    robot_id: Optional[str] = None, 
+    robot_id: Optional[str] = None,
+    organization: Optional[str] = None,
     limit: int = 50
 ) -> List[Dict[str, Any]]:
     """
@@ -80,11 +106,48 @@ def query_notifications(
         query_filter["category"] = category.upper()
     if robot_id:
         query_filter["robot_id"] = robot_id
-        
+    if organization:
+        query_filter["organization"] = organization
+
     cursor = db["notifications"].find(query_filter)
     notifications = [notification for notification in cursor]
     results = sorted(notifications, key=lambda x: x.get("timestamp", ""), reverse=True)
     return results[:limit]
+
+
+def list_notifications_for_user(
+    db: MockDatabase,
+    current_user: Dict[str, Any],
+    category: Optional[str] = None,
+    robot_id: Optional[str] = None,
+    limit: int = 50,
+) -> List[Dict[str, Any]]:
+    """
+    Returns notifications visible to the current user.
+
+    Rovex admins can inspect all alerts. Hospital-scoped users are restricted to
+    the notifications tagged with their own organization.
+    """
+    organization = None if is_admin(current_user) else current_user["organization"]
+    return query_notifications(
+        db=db,
+        category=category,
+        robot_id=robot_id,
+        organization=organization,
+        limit=limit,
+    )
+
+
+def get_logs_payload(lines_count: int = 100) -> Dict[str, Any]:
+    """
+    Returns a normalized response payload for the admin log-stream endpoint.
+    """
+    return {
+        "status": "success",
+        "file_path": LOG_FILE_PATH,
+        "lines_count": lines_count,
+        "logs": get_live_log_stream(lines_count=lines_count),
+    }
 
 
 def get_live_log_stream(lines_count: int = 100) -> str:

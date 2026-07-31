@@ -8,22 +8,13 @@ or robot, and stream raw consolidated log outputs directly from the local log fi
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, Query, status
-from pydantic import BaseModel, Field
 
-from app.core.auth import RBACChecker, get_current_user_from_cookie_or_header
+from app.core.auth import RBACChecker, get_current_user_from_cookie_or_header, is_admin
 from app.core.database import MockDatabase, get_nosql_db
 from app.services.notification import service as notification_service
+from app.services.notification.schemas import NotificationCreatePayload
 
 router = APIRouter(prefix="/api/notifications", tags=["Notification Service"])
-
-
-class NotificationCreatePayload(BaseModel):
-    """
-    Schema for validating notification trigger inputs.
-    """
-    robot_id: str = Field(..., description="The robot ID associated with this alert")
-    message: str = Field(..., description="The descriptive alert message")
-    category: str = Field("GENERAL", description="CRITICAL, GENERAL, ANALYTICS, SUGGESTIONS, or MARKETING")
 
 
 @router.post("", response_model=Dict[str, Any], status_code=status.HTTP_201_CREATED)
@@ -40,7 +31,8 @@ def trigger_notification(
         db=db,
         robot_id=payload.robot_id,
         message=payload.message,
-        category=payload.category
+        category=payload.category,
+        organization=payload.organization or (None if is_admin(current_user) else current_user["organization"]),
     )
     return {"status": "success", "notification": alert}
 
@@ -57,13 +49,13 @@ def list_notifications(
     Retrieves historical alerts and system notifications from the NoSQL database.
     Supports filtering by category or robot ID.
     """
-    alerts = notification_service.query_notifications(
+    return notification_service.list_notifications_for_user(
         db=db,
+        current_user=current_user,
         category=category,
         robot_id=robot_id,
-        limit=limit
+        limit=limit,
     )
-    return alerts
 
 
 @router.get("/logs", response_model=Dict[str, Any])
@@ -75,10 +67,4 @@ def stream_system_logs(
     Reads and streams the physical 'data_pool_notifications.log' file on disk.
     Restricted to Rovex Admins to ensure platform audit logs remain highly secure.
     """
-    log_content = notification_service.get_live_log_stream(lines_count=lines)
-    return {
-        "status": "success",
-        "file_path": notification_service.LOG_FILE_PATH,
-        "lines_count": lines,
-        "logs": log_content
-    }
+    return notification_service.get_logs_payload(lines_count=lines)

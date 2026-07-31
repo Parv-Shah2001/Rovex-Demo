@@ -93,6 +93,12 @@ class TestRovexPlatform(unittest.TestCase):
         tampered_token = token + "modified"
         self.assertIsNone(verify_access_token(tampered_token))
 
+        # JSON payload format should safely preserve organizations containing delimiters.
+        colon_org_token = create_access_token("triage_bot", "supervisor", "St. Jude Hospital: Wing A")
+        colon_org_payload = verify_access_token(colon_org_token)
+        self.assertIsNotNone(colon_org_payload)
+        self.assertEqual(colon_org_payload["organization"], "St. Jude Hospital: Wing A")
+
 
     # =====================================================================
     # 2. ADMIN VS SUPERVISOR ROLE SEPARATION TESTS
@@ -163,6 +169,73 @@ class TestRovexPlatform(unittest.TestCase):
         # Change User Role (RBAC shift)
         updated = user_service.update_user_role(self.db_sql, unique_username, "sub-supervisor")
         self.assertEqual(updated.role, "sub-supervisor")
+
+        # Invalid organization/role combinations should be rejected.
+        with self.assertRaises(ValueError):
+            user_service.create_user(
+                self.db_sql,
+                UserCreate(
+                    username="invalid_hq_employee",
+                    password="securepassword123",
+                    role="employee",
+                    organization=config.ROVEX_ORGANIZATION,
+                    full_name="Invalid HQ Employee",
+                    email="invalid.hq@rovexrobotics.com",
+                ),
+            )
+
+    def test_supervisor_provisioning_is_scoped_to_own_hospital(self):
+        """
+        Verifies supervisor-driven provisioning stays within the supervisor's own
+        organization and cannot create elevated platform-wide accounts.
+        """
+        supervisor_actor = {
+            "username": "sup_sarah",
+            "role": "supervisor",
+            "organization": "St. Jude Hospital",
+        }
+
+        created_user = user_service.create_user_for_actor(
+            self.db_sql,
+            UserCreate(
+                username="ward_clerk_jane",
+                password="securepassword123",
+                role="employee",
+                organization="St. Jude Hospital",
+                full_name="Ward Clerk Jane",
+                email="ward.clerk.jane@stjude.org",
+            ),
+            supervisor_actor,
+        )
+        self.assertEqual(created_user.organization, "St. Jude Hospital")
+
+        with self.assertRaises(ValueError):
+            user_service.create_user_for_actor(
+                self.db_sql,
+                UserCreate(
+                    username="cross_org_user",
+                    password="securepassword123",
+                    role="employee",
+                    organization="City General Hospital",
+                    full_name="Cross Org User",
+                    email="cross.org@citygeneral.org",
+                ),
+                supervisor_actor,
+            )
+
+        with self.assertRaises(ValueError):
+            user_service.create_user_for_actor(
+                self.db_sql,
+                UserCreate(
+                    username="rogue_admin",
+                    password="securepassword123",
+                    role="admin",
+                    organization=config.ROVEX_ORGANIZATION,
+                    full_name="Rogue Admin",
+                    email="rogue.admin@rovexrobotics.com",
+                ),
+                supervisor_actor,
+            )
 
 
     # =====================================================================
@@ -360,6 +433,50 @@ class TestRovexPlatform(unittest.TestCase):
         self.assertIn("rovi-03", live_logs)
         self.assertIn("CRITICAL", live_logs)
         self.assertIn("collision safety trigger", live_logs.lower())
+
+    def test_notification_queries_are_scoped_by_organization_for_hospital_staff(self):
+        """
+        Verifies notification feeds remain organization-scoped for hospital users
+        while Rovex admins retain global visibility.
+        """
+        notification_service.log_system_notification(
+            db=nosql_db,
+            robot_id="rovi-01",
+            message="St. Jude scoped alert",
+            category="GENERAL",
+        )
+        notification_service.log_system_notification(
+            db=nosql_db,
+            robot_id="rovi-03",
+            message="City General scoped alert",
+            category="GENERAL",
+        )
+        notification_service.log_system_notification(
+            db=nosql_db,
+            robot_id="FLEET",
+            message="Queued St. Jude fleet alert",
+            category="SUGGESTIONS",
+            organization="St. Jude Hospital",
+        )
+
+        supervisor_user = {
+            "username": "sup_sarah",
+            "role": "supervisor",
+            "organization": "St. Jude Hospital",
+        }
+        admin_user = {
+            "username": "rovex_admin",
+            "role": "admin",
+            "organization": config.ROVEX_ORGANIZATION,
+        }
+
+        st_jude_alerts = notification_service.list_notifications_for_user(nosql_db, supervisor_user)
+        admin_alerts = notification_service.list_notifications_for_user(nosql_db, admin_user)
+
+        self.assertTrue(any(alert["message"] == "St. Jude scoped alert" for alert in st_jude_alerts))
+        self.assertTrue(any(alert["message"] == "Queued St. Jude fleet alert" for alert in st_jude_alerts))
+        self.assertFalse(any(alert["message"] == "City General scoped alert" for alert in st_jude_alerts))
+        self.assertTrue(any(alert["message"] == "City General scoped alert" for alert in admin_alerts))
 
     def test_admin_scheduled_tasks_resolve_to_hospital_organization(self):
         """

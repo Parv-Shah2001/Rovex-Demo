@@ -218,7 +218,8 @@ def schedule_transit_task(
             db=db_nosql,
             robot_id="FLEET",
             message=f"Task '{task_id}' queued in PENDING status for {task_organization}. No idle robots available in network.",
-            category="SUGGESTIONS"
+            category="SUGGESTIONS",
+            organization=task_organization,
         )
 
     return db_task

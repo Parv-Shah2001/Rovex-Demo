@@ -6,11 +6,12 @@ and RBAC role updates, integrated directly with SQLAlchemy sessions.
 """
 
 import logging
-from typing import List, Optional
+from typing import Dict, List, Optional
 from sqlalchemy.orm import Session
 
 from app.core.config import VALID_ROLES
 from app.core.database import UserSQL
+from app.services.user.permissions import ensure_user_creation_allowed, validate_role_organization_pair
 from app.services.user.schemas import UserCreate
 
 logger = logging.getLogger("rovex.user_service")
@@ -50,9 +51,11 @@ def create_user(db: Session, payload: UserCreate) -> UserSQL:
     existing_user = get_user_by_username(db, payload.username)
     if existing_user:
         raise ValueError(f"Username '{payload.username}' is already in use.")
-        
+
     if payload.role not in VALID_ROLES:
         raise ValueError(f"Invalid role '{payload.role}'. Must be one of: {list(VALID_ROLES)}")
+
+    validate_role_organization_pair(payload.role, payload.organization)
 
     db_user = UserSQL(
         username=payload.username,
@@ -81,12 +84,34 @@ def update_user_role(db: Session, username: str, new_role: str) -> UserSQL:
     user = get_user_by_username(db, username)
     if not user:
         raise ValueError(f"User '{username}' not found.")
-        
+
+    validate_role_organization_pair(new_role, user.organization)
+
     user.role = new_role
     db.commit()
     db.refresh(user)
     logger.info(f"Updated user role: '{username}' is now a '{new_role}'.")
     return user
+
+
+def create_user_for_actor(db: Session, payload: UserCreate, actor: Dict[str, str]) -> UserSQL:
+    """
+    Creates a user account on behalf of an authenticated actor.
+
+    Provisioning rules live in the user domain so routers stay transport-focused
+    and future extraction into a dedicated identity service remains straightforward.
+    """
+    ensure_user_creation_allowed(actor, payload.role, payload.organization)
+    return create_user(db, payload)
+
+
+def get_visible_users(db: Session, actor: Dict[str, str]) -> List[UserSQL]:
+    """
+    Returns the users visible to the supplied actor according to organization scope.
+    """
+    if actor["role"] == "admin":
+        return get_all_users(db)
+    return get_users_by_organization(db, actor["organization"])
 
 
 def get_all_users(db: Session) -> List[UserSQL]:

@@ -5,24 +5,22 @@ Provides routes for user registration, session logins/logouts, profile queries,
 and role configuration (RBAC updates). Endpoints utilize dependency injection for role checks.
 """
 
+from typing import Any, Dict, List
+
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
-from typing import List, Dict, Any
 
+from app.core.auth import RBACChecker, create_access_token, get_current_user_from_cookie_or_header
+from app.core.config import ACCESS_TOKEN_EXPIRE_SECONDS
 from app.core.database import get_db
-from app.core.auth import (
-    create_access_token, 
-    get_current_user_from_cookie_or_header, 
-    RBACChecker,
-    is_admin
-)
-from app.services.user.schemas import UserLoginRequest, UserCreate, UserResponse, RoleUpdatePayload
 from app.services.user import service as user_service
+from app.services.user.responses import build_login_response
+from app.services.user.schemas import LoginResponse, RoleUpdatePayload, UserCreate, UserLoginRequest, UserResponse
 
 router = APIRouter(prefix="/api/users", tags=["User Management"])
 
 
-@router.post("/login", response_model=Dict[str, Any])
+@router.post("/login", response_model=LoginResponse)
 def login_user(payload: UserLoginRequest, response: Response, db: Session = Depends(get_db)):
     """
     Logs in a user, issues a secure token, and configures an 'access_token' cookie 
@@ -35,30 +33,18 @@ def login_user(payload: UserLoginRequest, response: Response, db: Session = Depe
             detail="Invalid username or password"
         )
         
-    # Generate cryptographic token (expires in 2 hours)
     token = create_access_token(user.username, user.role, user.organization)
-    
-    # Configure session cookie for HTML frontend views
+
     response.set_cookie(
         key="access_token",
         value=f"Bearer {token}",
         httponly=True,
-        max_age=7200,
+        max_age=ACCESS_TOKEN_EXPIRE_SECONDS,
         samesite="lax",
         secure=False  # Set to True in production with HTTPS
     )
-    
-    return {
-        "status": "success",
-        "access_token": token,
-        "token_type": "bearer",
-        "user": {
-            "username": user.username,
-            "role": user.role,
-            "organization": user.organization,
-            "full_name": user.full_name
-        }
-    }
+
+    return build_login_response(token, user)
 
 
 @router.post("/logout")
@@ -71,14 +57,20 @@ def logout_user(response: Response):
 
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-def register_user(payload: UserCreate, db: Session = Depends(get_db)):
+def register_user(
+    payload: UserCreate,
+    current_user: Dict[str, Any] = Depends(RBACChecker(["admin", "supervisor"])),
+    db: Session = Depends(get_db),
+):
     """
     Registers a new institution user into the OLTP database.
-    This route can be accessed by anyone in the demo, but is typically constrained.
+
+    Account provisioning is intentionally restricted to Rovex admins and
+    hospital supervisors so identity management stays aligned with the user
+    domain's role and organization boundaries.
     """
     try:
-        new_user = user_service.create_user(db, payload)
-        return new_user
+        return user_service.create_user_for_actor(db, payload, current_user)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
@@ -101,9 +93,7 @@ def get_organization_members(
     - Rovex admins can see ALL users across every organization.
     - Hospital staff can only see members of their own organization.
     """
-    if is_admin(current_user):
-        return user_service.get_all_users(db)
-    return user_service.get_users_by_organization(db, current_user["organization"])
+    return user_service.get_visible_users(db, current_user)
 
 
 @router.put("/{username}/role", response_model=UserResponse)

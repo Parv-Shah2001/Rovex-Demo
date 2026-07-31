@@ -46,10 +46,12 @@ tests/
 ## 🌟 Key Features & Demonstrations
 
 ### 🧑‍💼 1. Hierarchical User Management & RBAC
-Three pre-configured profiles represent the institution's personnel:
-- **Supervisor (Dr. Mitchell)**: Full administrator rights. Can modify staff member roles, sanction/un-sanction robots, adjust corridor routing costs, and access the Secured Query Sandbox and File Logs.
-- **Sub-Supervisor (Nurse Kelly)**: Dispatch rights. Can schedule new transport missions, view live robot tracking coordinates, and adjust traffic corridor priorities.
-- **Employee (Orderly John)**: Viewer rights. Can inspect scheduled missions, ETAs, and submit emergency maintenance requests.
+Five pre-configured seed users demonstrate both role hierarchy and organization scoping:
+- **Rovex Admin (James Whitfield)**: Platform-wide rights across every hospital organization, including the admin dashboard, robot sanction controls, and sandbox query tools.
+- **Supervisor (Dr. Sarah Mitchell / St. Jude Hospital)**: Hospital manager rights inside St. Jude, including fleet oversight, staff visibility, and scoped account provisioning for that institution.
+- **Sub-Supervisor (Nurse Thomas Kelly / St. Jude Hospital)**: Dispatch rights for scheduling missions, reviewing live status, and adjusting corridor priorities.
+- **Employee (Orderly John Doe / St. Jude Hospital)**: Viewer-only rights plus service-request filing.
+- **Supervisor (Dr. Alan Grant / City General Hospital)**: A second hospital supervisor used to validate organization scoping and admin cross-organization visibility.
 
 ### 🤖 2. Telemetry Ingestion (Pydantic Validation)
 Supports high-frequency telemetry packets, validating physical speed and steering parameters, battery mah capacities, 2D coordinates, safety proximity obstacles, and camera/lidar diagnostics.
@@ -64,10 +66,11 @@ Implements the **A\* Search Algorithm** on a 2D graph representing hospital zone
 Categorizes all alerts into **CRITICAL, GENERAL, ANALYTICS, SUGGESTIONS, and MARKETING** with strict numerical priorities. 
 - Alerts are appended to a persistent local log file `data_pool_notifications.log` on disk to simulate a unified data pool (ready for future ELT ingestion).
 - Alerts are also written to a MongoDB-like index enabling instant rendering on frontend cards.
+- Notification records now carry organization scope so hospital users only see alerts from their own institution, while Rovex admins retain global visibility.
 
 ### 🛠️ 5. Admin Sandboxed Database Query Workspace
 Provides a secure console where administrators can run manual queries:
-- **SQL Console**: Executes actual raw SQL commands (e.g. `SELECT * FROM tasks WHERE status='completed'`) against the active OLTP database.
+- **SQL Console**: Executes read-only SQL statements (including read-only CTEs such as `WITH scoped AS (...) SELECT * FROM scoped`) against the active OLTP database.
 - **NoSQL Console**: Parses and executes PyMongo-style query strings (e.g. `db.robots.find({"battery": {"$lt": 50}})` or `db.notifications.find({"category": "CRITICAL"})`) directly.
 
 ### 💬 6. Gemini-Style Chat Assistant & Canvas Visualizer
