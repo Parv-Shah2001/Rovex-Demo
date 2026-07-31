@@ -99,6 +99,12 @@ The face-to-face employee workspace is styled with a sleek **Gemini-like AI Chat
 4. **Navigate to the Platform**:
    Open your browser and navigate to: `http://localhost:8000/`
 
+5. **When validating frontend HTML/layout changes locally**:
+   - restart the active `uvicorn` process after pulling the newest branch updates,
+   - then do a hard refresh in the browser (`Ctrl+Shift+R` / `Cmd+Shift+R`).
+
+   This project serves HTML templates directly from FastAPI, so restarting the local process is the safest way to guarantee the browser is testing the newest frontend markup during iteration.
+
 ---
 
 ## 🔍 Code Reliability & Best Practices

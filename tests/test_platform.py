@@ -294,8 +294,13 @@ class TestRovexPlatform(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("core-shell", html)
         self.assertIn("core-main", html)
+        self.assertIn("core-main-header", html)
         self.assertIn("core-content-split", html)
         self.assertIn("core-content-panel", html)
+        self.assertIn("core-sidebar", html)
+        self.assertIn("sidebar-scrim", html)
+        self.assertIn("sidebar-collapsed", html)
+        self.assertIn("toggleSidebar()", html)
         self.assertIn("@media (min-width: 768px)", html)
 
     def test_template_loader_refreshes_changed_html_files(self):

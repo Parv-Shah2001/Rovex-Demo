@@ -16,51 +16,100 @@
         .font-mono-custom {
             font-family: 'Fira Code', monospace;
         }
+        :root {
+            --sidebar-width-expanded: 20rem;
+            --sidebar-width-collapsed: 5.5rem;
+            --sidebar-width-current: var(--sidebar-width-expanded);
+        }
         .core-shell {
             min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            overflow-x: hidden;
+            overflow: hidden;
         }
         .core-main {
-            flex: 1 1 auto;
-            min-width: 0;
-            min-height: 0;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
+            min-height: 100vh;
+            margin-left: 0;
+            width: 100%;
+            overflow-y: auto;
+            overflow-x: hidden;
+            transition: margin-left 220ms ease, width 220ms ease;
+        }
+        .core-main-header {
+            position: sticky;
+            top: 0;
+            z-index: 30;
+            backdrop-filter: blur(18px);
         }
         .core-content-split {
-            flex: 1 1 auto;
-            min-height: 0;
             display: grid;
             grid-template-columns: minmax(0, 1fr);
-            overflow: hidden;
         }
         .core-content-panel {
             min-width: 0;
-            min-height: 0;
-            display: flex;
-            flex-direction: column;
-            overflow-y: auto;
         }
         .core-sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            width: min(20rem, 86vw);
+            display: flex;
+            flex-direction: column;
+            z-index: 40;
+            transform: translateX(-100%);
+            transition: width 220ms ease, transform 220ms ease;
+        }
+        .sidebar-scrim {
+            position: fixed;
+            inset: 0;
             display: none;
-            width: 20rem;
-            flex-shrink: 0;
+            border: 0;
+            background: rgba(2, 6, 23, 0.72);
+            backdrop-filter: blur(6px);
+            z-index: 35;
+        }
+        .core-shell.sidebar-mobile-open .core-sidebar {
+            transform: translateX(0);
+        }
+        .core-shell.sidebar-mobile-open .sidebar-scrim {
+            display: block;
+        }
+        .sidebar-hide-on-collapse {
+            transition: opacity 180ms ease;
         }
         @media (min-width: 768px) {
             .core-shell {
-                height: 100vh;
-                flex-direction: row;
-                overflow: hidden;
+                --sidebar-width-current: var(--sidebar-width-expanded);
+            }
+            .core-shell.sidebar-collapsed {
+                --sidebar-width-current: var(--sidebar-width-collapsed);
             }
             .core-sidebar {
-                display: flex;
-                height: 100vh;
+                width: var(--sidebar-width-current);
+                transform: translateX(0);
             }
+            .core-main {
+                margin-left: var(--sidebar-width-current);
+                width: calc(100% - var(--sidebar-width-current));
+            }
+            .core-shell.sidebar-collapsed .sidebar-hide-on-collapse {
+                display: none !important;
+            }
+            .core-shell.sidebar-collapsed .sidebar-section-card {
+                padding-left: 0.75rem;
+                padding-right: 0.75rem;
+            }
+            .core-shell.sidebar-collapsed .sidebar-user-row,
+            .core-shell.sidebar-collapsed .sidebar-brand-lockup,
+            .core-shell.sidebar-collapsed .sidebar-footer-row {
+                justify-content: center;
+            }
+            .core-shell.sidebar-collapsed .sidebar-footer-row button {
+                justify-content: center;
+            }
+        }
+        @media (min-width: 1280px) {
             .core-content-split {
-                grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+                grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
             }
         }
         /* Custom scrollbar */
@@ -81,34 +130,35 @@
     </style>
 </head>
 <body class="core-shell text-slate-100">
+    <button id="sidebarScrim" type="button" class="sidebar-scrim" aria-label="Close sidebar" onclick="closeSidebarOverlay()"></button>
 
     <!-- Sidebar (Gemini Style) -->
-    <aside class="core-sidebar bg-slate-950 border-r border-slate-900 flex-col justify-between">
+    <aside class="core-sidebar bg-slate-950 border-r border-slate-900 flex-col justify-between shadow-2xl shadow-black/40">
         <div class="p-6 space-y-6 flex-grow overflow-y-auto">
             
             <!-- Company Logo -->
-            <div class="flex items-center space-x-3 pb-4 border-b border-slate-900">
+            <div class="flex items-center space-x-3 pb-4 border-b border-slate-900 sidebar-brand-lockup">
                 <div class="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center shadow-lg">
                     <i class="fa-solid fa-robot text-base text-white"></i>
                 </div>
-                <div>
+                <div class="sidebar-hide-on-collapse">
                     <h2 class="text-base font-bold tracking-tight">ROVEX CORE</h2>
                     <span class="text-[9px] block text-slate-500 uppercase tracking-widest font-semibold">St. Jude Hospital</span>
                 </div>
             </div>
 
             <!-- Active User Card with RBAC badge -->
-            <div class="bg-slate-900/40 border border-slate-800/80 p-4 rounded-xl space-y-2">
-                <div class="flex items-center space-x-3">
+            <div class="bg-slate-900/40 border border-slate-800/80 p-4 rounded-xl space-y-2 sidebar-section-card">
+                <div class="flex items-center space-x-3 sidebar-user-row">
                     <div class="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center border border-indigo-500/30 text-indigo-400 font-bold text-sm">
                         <span id="userInitials">U</span>
                     </div>
-                    <div>
+                    <div class="sidebar-hide-on-collapse">
                         <h4 id="userName" class="text-xs font-bold text-white">...</h4>
                         <span id="userRoleBadge" class="text-[9px] font-bold px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">...</span>
                     </div>
                 </div>
-                <div id="adminPortalBtn" class="hidden pt-1.5">
+                <div id="adminPortalBtn" class="hidden pt-1.5 sidebar-hide-on-collapse">
                     <a href="/admin" class="w-full text-center block py-1.5 rounded bg-violet-600 hover:bg-violet-500 text-white text-[10px] font-bold tracking-wider uppercase transition">
                         <i class="fa-solid fa-shield-halved mr-1"></i> Admin Sandbox Platform
                     </a>
@@ -116,7 +166,7 @@
             </div>
 
             <!-- Active / Ongoing Missions List -->
-            <div class="space-y-3">
+            <div class="space-y-3 sidebar-hide-on-collapse">
                 <div class="flex justify-between items-center text-xs">
                     <span class="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Ongoing Tasks</span>
                     <button onclick="fetchTasks()" class="text-[10px] text-indigo-400 hover:text-indigo-300 font-semibold"><i class="fa-solid fa-rotate-right"></i></button>
@@ -129,7 +179,7 @@
             </div>
 
             <!-- Pre-set Corridor Weights List (Fleet Orchestration) -->
-            <div class="space-y-3">
+            <div class="space-y-3 sidebar-hide-on-collapse">
                 <div class="flex justify-between items-center text-xs">
                     <span class="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Corridor Traffic Priority</span>
                     <button onclick="openWeightModal()" class="text-[10px] text-indigo-400 hover:text-indigo-300 font-semibold"><i class="fa-solid fa-plus mr-0.5"></i> Update</button>
@@ -142,9 +192,9 @@
         </div>
 
         <!-- Sidebar footer -->
-        <div class="p-6 border-t border-slate-900 bg-slate-950 flex justify-between items-center text-xs text-slate-500">
-            <span>Rovex Core v2.4</span>
-            <button onclick="handleLogout()" class="hover:text-rose-400"><i class="fa-solid fa-right-from-bracket"></i> Sign out</button>
+        <div class="p-6 border-t border-slate-900 bg-slate-950 flex justify-between items-center text-xs text-slate-500 sidebar-footer-row">
+            <span class="sidebar-hide-on-collapse">Rovex Core v2.4</span>
+            <button onclick="handleLogout()" class="hover:text-rose-400 inline-flex items-center"><i class="fa-solid fa-right-from-bracket"></i><span class="sidebar-hide-on-collapse ml-1.5">Sign out</span></button>
         </div>
     </aside>
 
@@ -152,12 +202,17 @@
     <main class="core-main">
         
         <!-- Header -->
-        <header class="h-16 border-b border-slate-900 bg-slate-950/40 px-6 flex justify-between items-center">
-            <div class="flex items-center space-x-2 md:hidden">
-                <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center">
-                    <i class="fa-solid fa-robot text-sm text-white"></i>
+        <header class="core-main-header h-16 border-b border-slate-900 bg-slate-950/70 px-6 flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <button type="button" onclick="toggleSidebar()" class="w-10 h-10 rounded-xl border border-slate-800 bg-slate-950/70 text-slate-300 hover:text-white hover:border-slate-700 transition flex items-center justify-center">
+                    <i id="sidebarToggleIcon" class="fa-solid fa-bars-staggered text-sm"></i>
+                </button>
+                <div class="flex items-center space-x-2 md:hidden">
+                    <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center">
+                        <i class="fa-solid fa-robot text-sm text-white"></i>
+                    </div>
+                    <span class="text-sm font-bold tracking-wider">ROVEX</span>
                 </div>
-                <span class="text-sm font-bold tracking-wider">ROVEX</span>
             </div>
             <div class="text-xs text-slate-400 flex items-center space-x-2 font-mono-custom">
                 <span class="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-ping"></span>
@@ -169,10 +224,10 @@
         </header>
 
         <!-- Dynamic Body Area: Left Side Chat, Right Side Graph Map -->
-        <div class="core-content-split">
+        <div class="core-content-split min-h-[calc(100vh-4rem)]">
             
             <!-- Gemini-like Chat & Task Section -->
-            <div class="core-content-panel border-b border-slate-900 md:border-b-0 md:border-r p-6 space-y-6">
+            <div class="core-content-panel border-b border-slate-900 xl:border-b-0 xl:border-r p-6 space-y-6">
                 
                 <!-- Gemini Welcome screen / Conversation container -->
                 <div class="flex-grow flex flex-col justify-end space-y-6 min-h-0" id="chatArea">
@@ -426,10 +481,62 @@
     <script>
         const token = localStorage.getItem('rovex_token');
         const userObj = JSON.parse(localStorage.getItem('rovex_user') || '{}');
+        const SIDEBAR_COLLAPSE_KEY = 'rovex_core_sidebar_collapsed';
         
         let nodesLayout = {};
         let edgesLayout = [];
         let canvas, ctx;
+
+        function syncSidebarToggleIcon() {
+            const toggleIcon = document.getElementById('sidebarToggleIcon');
+            if (!toggleIcon) return;
+
+            const isDesktop = window.innerWidth >= 768;
+            const isCollapsed = document.body.classList.contains('sidebar-collapsed');
+            const isMobileOpen = document.body.classList.contains('sidebar-mobile-open');
+
+            if (isDesktop) {
+                toggleIcon.className = `fa-solid ${isCollapsed ? 'fa-angles-right' : 'fa-angles-left'} text-sm`;
+                return;
+            }
+
+            toggleIcon.className = `fa-solid ${isMobileOpen ? 'fa-xmark' : 'fa-bars-staggered'} text-sm`;
+        }
+
+        function applySidebarStateFromStorage() {
+            if (window.innerWidth < 768) {
+                document.body.classList.remove('sidebar-collapsed');
+                return;
+            }
+
+            const shouldCollapse = localStorage.getItem(SIDEBAR_COLLAPSE_KEY) === 'true';
+            document.body.classList.toggle('sidebar-collapsed', shouldCollapse);
+        }
+
+        function closeSidebarOverlay() {
+            document.body.classList.remove('sidebar-mobile-open');
+            syncSidebarToggleIcon();
+        }
+
+        function toggleSidebar() {
+            if (window.innerWidth < 768) {
+                document.body.classList.toggle('sidebar-mobile-open');
+                syncSidebarToggleIcon();
+                return;
+            }
+
+            const collapsed = document.body.classList.toggle('sidebar-collapsed');
+            localStorage.setItem(SIDEBAR_COLLAPSE_KEY, collapsed ? 'true' : 'false');
+            syncSidebarToggleIcon();
+        }
+
+        window.addEventListener('resize', () => {
+            if (window.innerWidth >= 768) {
+                document.body.classList.remove('sidebar-mobile-open');
+                applySidebarStateFromStorage();
+            }
+            syncSidebarToggleIcon();
+        });
 
         // On Load
         window.addEventListener('DOMContentLoaded', async () => {
@@ -439,6 +546,9 @@
                 window.location.href = '/';
                 return;
             }
+
+            applySidebarStateFromStorage();
+            syncSidebarToggleIcon();
 
             // Fill header and profile card details
             document.getElementById('userName').innerText = userObj.full_name;
