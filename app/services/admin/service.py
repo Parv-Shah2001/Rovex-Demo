@@ -1,9 +1,10 @@
 """
 File: app/services/admin/service.py
-Description: Administrative database sandbox and query service.
-Implements the backend of the secured admin sandbox, allowing live database querying.
-Executes raw SQL queries against the SQLAlchemy/SQLite engine, and parses PyMongo-like
-string queries (e.g., 'db.robots.find(...)') to execute operations against the Mock PyMongo client.
+Description: Administrative database sandbox and query service for Rovex platform operators.
+Implements the backend of the secured admin sandbox, allowing Rovex admins to query
+live databases across ALL organizations. Executes raw SQL queries against the
+SQLAlchemy/SQLite engine, and parses PyMongo-like string queries (e.g., 'db.robots.find(...)')
+to execute operations against the Mock PyMongo client.
 """
 
 import re

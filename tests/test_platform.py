@@ -4,9 +4,10 @@ Description: Full test suite for the Rovex hospital backend platform.
 Validates:
   1. Cryptographic token signing and validation (HMAC-SHA256).
   2. SQL user account creation, verification, and RBAC updates.
-  3. NoSQL robot profile queries and live battery/localization updates.
-  4. A* pathfinding calculations, distances, and edge weight modifiers.
-  5. Notification logging and raw physical system log retrieval.
+  3. Admin vs Supervisor role separation and access scoping.
+  4. NoSQL robot profile queries and live battery/localization updates.
+  5. A* pathfinding calculations, distances, and edge weight modifiers.
+  6. Notification logging and raw physical system log retrieval.
 """
 
 import os
@@ -16,7 +17,7 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 
 from app.core import config
-from app.core.auth import create_access_token, verify_access_token
+from app.core.auth import create_access_token, verify_access_token, is_admin
 from app.core.database import SessionLocal, Base, engine, init_db, nosql_db
 from app.services.user import service as user_service
 from app.services.user.schemas import UserCreate
@@ -55,9 +56,9 @@ class TestRovexPlatform(unittest.TestCase):
         Tests HMAC-SHA256 signature token creation and verifying mechanism.
         Checks that expired or modified payloads are correctly invalidated.
         """
-        username = "admin"
-        role = "supervisor"
-        org = "St. Jude Hospital"
+        username = "rovex_admin"
+        role = "admin"
+        org = "Rovex Robotics Inc."
         
         # Create a valid token (expires in 2 hours)
         token = create_access_token(username, role, org, expires_in_seconds=7200)
@@ -81,7 +82,38 @@ class TestRovexPlatform(unittest.TestCase):
 
 
     # =====================================================================
-    # 2. USER SQL OLTP & RBAC TESTS
+    # 2. ADMIN VS SUPERVISOR ROLE SEPARATION TESTS
+    # =====================================================================
+    def test_admin_vs_supervisor_role_separation(self):
+        """
+        Validates that the admin role belongs to Rovex (platform-wide access)
+        while the supervisor role belongs to a hospital organization (org-scoped access).
+        Tests the is_admin helper function and organization scoping.
+        """
+        # Admin user — belongs to Rovex
+        admin_user = {"username": "rovex_admin", "role": "admin", "organization": "Rovex Robotics Inc."}
+        self.assertTrue(is_admin(admin_user))
+        
+        # Supervisor user — belongs to a hospital
+        supervisor_user = {"username": "sup_sarah", "role": "supervisor", "organization": "St. Jude Hospital"}
+        self.assertFalse(is_admin(supervisor_user))
+        
+        # Admin sees all robots across organizations
+        all_robots = robot_service.get_all_robots(nosql_db)
+        admin_visible = len(all_robots)
+        
+        # Supervisor sees only robots in their own organization
+        st_jude_robots = robot_service.get_robots_by_organization(nosql_db, "St. Jude Hospital")
+        supervisor_visible = len(st_jude_robots)
+        
+        # Admin should see more robots than a single-org supervisor
+        self.assertGreater(admin_visible, supervisor_visible)
+        self.assertEqual(admin_visible, 4)  # All 4 seed robots
+        self.assertEqual(supervisor_visible, 3)  # St. Jude has 3 robots
+
+
+    # =====================================================================
+    # 3. USER SQL OLTP & RBAC TESTS
     # =====================================================================
     def test_sql_user_creation_and_rbac(self):
         """
@@ -121,7 +153,7 @@ class TestRovexPlatform(unittest.TestCase):
 
 
     # =====================================================================
-    # 3. ROBOT PROFILE & INGESTION TELEMETRY (NOSQL) TESTS
+    # 4. ROBOT PROFILE & INGESTION TELEMETRY (NOSQL) TESTS
     # =====================================================================
     def test_nosql_robot_biodata_and_telemetry(self):
         """
@@ -185,7 +217,7 @@ class TestRovexPlatform(unittest.TestCase):
 
 
     # =====================================================================
-    # 4. A* PATHFINDING & ROUTING TESTS
+    # 5. A* PATHFINDING & ROUTING TESTS
     # =====================================================================
     def test_astar_route_planning(self):
         """
@@ -217,7 +249,7 @@ class TestRovexPlatform(unittest.TestCase):
 
 
     # =====================================================================
-    # 5. NOTIFICATION SERVICE & FILE LOG TESTS
+    # 6. NOTIFICATION SERVICE & FILE LOG TESTS
     # =====================================================================
     def test_notification_and_logs(self):
         """

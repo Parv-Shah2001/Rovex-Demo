@@ -79,28 +79,39 @@
             <div class="bg-slate-900/80 border border-slate-800 p-8 rounded-2xl shadow-2xl relative overflow-hidden backdrop-blur-md">
                 <div class="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl"></div>
                 
-                <h2 class="text-2xl font-bold mb-2">Sign in to St. Jude Hospital</h2>
+                <h2 class="text-2xl font-bold mb-2">Sign in to Rovex Platform</h2>
                 <p class="text-xs text-slate-400 mb-6">Select a pre-configured profile to authenticate into the system with specific permissions.</p>
 
                 <!-- Credentials Selector Buttons -->
                 <div class="space-y-3 mb-6">
-                    <button onclick="fillAndLogin('admin', 'adminpassword')" class="w-full text-left p-3.5 bg-indigo-950/20 hover:bg-indigo-950/40 border border-indigo-900/60 hover:border-indigo-700 rounded-xl transition duration-200 flex items-center justify-between group">
+                    <button onclick="fillAndLogin('rovex_admin', 'rovexadminpassword')" class="w-full text-left p-3.5 bg-rose-950/20 hover:bg-rose-950/40 border border-rose-900/60 hover:border-rose-700 rounded-xl transition duration-200 flex items-center justify-between group">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-8 h-8 rounded-lg bg-rose-900/60 flex items-center justify-center text-rose-300 group-hover:scale-105 transition"><i class="fa-solid fa-shield-halved"></i></div>
+                            <div>
+                                <h4 class="text-xs font-bold text-white">James Whitfield</h4>
+                                <p class="text-[10px] text-slate-400">Rovex Admin (Platform-wide Access)</p>
+                            </div>
+                        </div>
+                        <i class="fa-solid fa-chevron-right text-xs text-rose-500"></i>
+                    </button>
+
+                    <button onclick="fillAndLogin('sup_sarah', 'suppassword')" class="w-full text-left p-3.5 bg-indigo-950/20 hover:bg-indigo-950/40 border border-indigo-900/60 hover:border-indigo-700 rounded-xl transition duration-200 flex items-center justify-between group">
                         <div class="flex items-center space-x-3">
                             <div class="w-8 h-8 rounded-lg bg-indigo-900/60 flex items-center justify-center text-indigo-300 group-hover:scale-105 transition"><i class="fa-solid fa-user-shield"></i></div>
                             <div>
                                 <h4 class="text-xs font-bold text-white">Dr. Sarah Mitchell</h4>
-                                <p class="text-[10px] text-slate-400">Supervisor / Admin (Full Access)</p>
+                                <p class="text-[10px] text-slate-400">Supervisor / St. Jude Hospital</p>
                             </div>
                         </div>
                         <i class="fa-solid fa-chevron-right text-xs text-indigo-500"></i>
                     </button>
 
-                    <button onclick="fillAndLogin('sub_sarah', 'subpassword')" class="w-full text-left p-3.5 bg-slate-800/30 hover:bg-slate-800/60 border border-slate-700/60 hover:border-slate-500 rounded-xl transition duration-200 flex items-center justify-between group">
+                    <button onclick="fillAndLogin('sub_thomas', 'subpassword')" class="w-full text-left p-3.5 bg-slate-800/30 hover:bg-slate-800/60 border border-slate-700/60 hover:border-slate-500 rounded-xl transition duration-200 flex items-center justify-between group">
                         <div class="flex items-center space-x-3">
                             <div class="w-8 h-8 rounded-lg bg-slate-700/60 flex items-center justify-center text-slate-300 group-hover:scale-105 transition"><i class="fa-solid fa-user-gear"></i></div>
                             <div>
                                 <h4 class="text-xs font-bold text-white">Nurse Thomas Kelly</h4>
-                                <p class="text-[10px] text-slate-400">Sub-Supervisor (Schedule & Transit View)</p>
+                                <p class="text-[10px] text-slate-400">Sub-Supervisor / St. Jude Hospital</p>
                             </div>
                         </div>
                         <i class="fa-solid fa-chevron-right text-xs text-slate-500"></i>
@@ -111,7 +122,7 @@
                             <div class="w-8 h-8 rounded-lg bg-slate-700/60 flex items-center justify-center text-slate-300 group-hover:scale-105 transition"><i class="fa-solid fa-user"></i></div>
                             <div>
                                 <h4 class="text-xs font-bold text-white">Orderly John Doe</h4>
-                                <p class="text-[10px] text-slate-400">Employee (Viewer Only / Access Request)</p>
+                                <p class="text-[10px] text-slate-400">Employee / St. Jude Hospital (Viewer Only)</p>
                             </div>
                         </div>
                         <i class="fa-solid fa-chevron-right text-xs text-slate-500"></i>
@@ -203,9 +214,9 @@
                     localStorage.setItem('rovex_user', JSON.stringify(data.user));
                     
                     // Redirect to corresponding page based on role:
-                    // Supervisors can view both Admin panel and Core platform. Let's redirect to core platform with quick options.
-                    if (data.user.role === 'supervisor') {
-                        window.location.href = '/core';
+                    // Admins go to the admin platform, hospital staff go to the core platform
+                    if (data.user.role === 'admin') {
+                        window.location.href = '/admin';
                     } else {
                         window.location.href = '/core';
                     }

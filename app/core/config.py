@@ -50,20 +50,38 @@ DEFAULT_EDGES = [
 
 # Seed Users (SQL Database Seed)
 # Structure: Username -> { password, role, organization, full_name, email }
-# Roles are: supervisor, sub-supervisor, employee
+#
+# RBAC Role Hierarchy:
+#   admin        : Rovex employee — platform-wide access across ALL organizations,
+#                  admin dashboard, sandbox queries, live logs, sanction controls.
+#   supervisor   : Hospital org supervisor — manages all robots and employees
+#                  within their own organization only.
+#   sub-supervisor : Hospital org sub-supervisor — can schedule tasks, view live
+#                    status, adjust corridor weights within their own organization.
+#   employee     : Hospital org employee — viewer only, can request access and
+#                  file service tickets.
 SEED_USERS = [
     {
         "id": 1,
-        "username": "admin",
-        "password": "adminpassword",  # Simple plain text password for demo
+        "username": "rovex_admin",
+        "password": "rovexadminpassword",
+        "role": "admin",
+        "organization": "Rovex Robotics Inc.",
+        "full_name": "James Whitfield",
+        "email": "j.whitfield@rovexrobotics.com"
+    },
+    {
+        "id": 2,
+        "username": "sup_sarah",
+        "password": "suppassword",
         "role": "supervisor",
         "organization": "St. Jude Hospital",
         "full_name": "Dr. Sarah Mitchell",
         "email": "sarah.mitchell@stjude.org"
     },
     {
-        "id": 2,
-        "username": "sub_sarah",
+        "id": 3,
+        "username": "sub_thomas",
         "password": "subpassword",
         "role": "sub-supervisor",
         "organization": "St. Jude Hospital",
@@ -71,7 +89,7 @@ SEED_USERS = [
         "email": "thomas.kelly@stjude.org"
     },
     {
-        "id": 3,
+        "id": 4,
         "username": "emp_john",
         "password": "emppassword",
         "role": "employee",
@@ -80,8 +98,8 @@ SEED_USERS = [
         "email": "john.doe@stjude.org"
     },
     {
-        "id": 4,
-        "username": "univ_supervisor",
+        "id": 5,
+        "username": "sup_alan",
         "password": "univpassword",
         "role": "supervisor",
         "organization": "City General Hospital",

@@ -49,7 +49,7 @@ class UserSQL(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True, nullable=False)
     password = Column(String, nullable=False)  # Stored plain for demo simplicity
-    role = Column(String, nullable=False)  # supervisor, sub-supervisor, employee
+    role = Column(String, nullable=False)  # admin, supervisor, sub-supervisor, employee
     organization = Column(String, nullable=False)
     full_name = Column(String, nullable=False)
     email = Column(String, nullable=False)

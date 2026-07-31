@@ -1,8 +1,10 @@
 """
 File: app/services/admin/router.py
-Description: FastAPI Router exposing administrative backend endpoints.
+Description: FastAPI Router exposing administrative backend endpoints for Rovex staff.
 Provides routes to retrieve aggregated operational statistics and execute queries
 against relational SQL and document NoSQL databases in a secured sandbox environment.
+All endpoints are restricted to the 'admin' role — Rovex employees who have
+platform-wide access across ALL organizations.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -27,13 +29,13 @@ class SandboxQueryPayload(BaseModel):
 
 @router.get("/stats", response_model=Dict[str, Any])
 def get_dashboard_statistics(
-    current_user: Dict[str, Any] = Depends(RBACChecker(["supervisor"])),
+    current_user: Dict[str, Any] = Depends(RBACChecker(["admin"])),
     db_sql: Session = Depends(get_db),
     db_nosql: MockDatabase = Depends(get_nosql_db)
 ):
     """
     Returns aggregated metrics spanning the entire hospital platform (robots, tasks, users).
-    Restricted to Supervisors.
+    Restricted to Rovex Admins only.
     """
     return admin_service.get_admin_dashboard_stats(db_sql, db_nosql)
 
@@ -41,7 +43,7 @@ def get_dashboard_statistics(
 @router.post("/query", response_model=Dict[str, Any])
 def run_database_sandbox_query(
     payload: SandboxQueryPayload,
-    current_user: Dict[str, Any] = Depends(RBACChecker(["supervisor"])),
+    current_user: Dict[str, Any] = Depends(RBACChecker(["admin"])),
     db_sql: Session = Depends(get_db),
     db_nosql: MockDatabase = Depends(get_nosql_db)
 ):
@@ -49,7 +51,7 @@ def run_database_sandbox_query(
     Runs a manual query in the secured sandbox environment.
     Supports standard SQL SELECT queries on SQLite (simulating Postgres OLTP),
     and PyMongo search commands on MongoDB.
-    Restricted to Supervisors.
+    Restricted to Rovex Admins only.
     """
     db_type_lower = payload.db_type.lower().strip()
     query_str = payload.query_string.strip()

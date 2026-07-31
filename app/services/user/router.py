@@ -13,7 +13,8 @@ from app.core.database import get_db
 from app.core.auth import (
     create_access_token, 
     get_current_user_from_cookie_or_header, 
-    RBACChecker
+    RBACChecker,
+    is_admin
 )
 from app.services.user.schemas import UserLoginRequest, UserCreate, UserResponse, RoleUpdatePayload
 from app.services.user import service as user_service
@@ -96,31 +97,32 @@ def get_organization_members(
     db: Session = Depends(get_db)
 ):
     """
-    Returns a list of all staff members within the current user's organization.
-    Supervisors can view members of their organization. Employees have view access too.
+    Returns a list of staff members visible to the current user.
+    - Rovex admins can see ALL users across every organization.
+    - Hospital staff can only see members of their own organization.
     """
-    # Enforce organizational boundary
-    members = user_service.get_users_by_organization(db, current_user["organization"])
-    return members
+    if is_admin(current_user):
+        return user_service.get_all_users(db)
+    return user_service.get_users_by_organization(db, current_user["organization"])
 
 
 @router.put("/{username}/role", response_model=UserResponse)
 def change_user_role(
     username: str,
     payload: RoleUpdatePayload,
-    current_user: Dict[str, Any] = Depends(RBACChecker(["supervisor"])),
+    current_user: Dict[str, Any] = Depends(RBACChecker(["admin"])),
     db: Session = Depends(get_db)
 ):
     """
-    Allows a Supervisor to modify a user's role (RBAC level).
-    Restricted entirely to Supervisors.
+    Allows a Rovex Admin to modify a user's role (RBAC level).
+    Restricted to Rovex Admins only — this is a platform-level action.
     """
     try:
-        # Prevent supervisors from self-demoting to keep system active in demo
+        # Prevent admins from self-demoting to keep system active in demo
         if current_user["username"] == username:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST, 
-                detail="Supervisors cannot demote themselves to ensure system remains manageable."
+                detail="Admins cannot demote themselves to ensure system remains manageable."
             )
             
         updated_user = user_service.update_user_role(db, username, payload.role)

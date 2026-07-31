@@ -108,7 +108,7 @@ def serve_core_platform_page(request: Request):
 def serve_admin_platform_page(request: Request):
     """
     Renders the Admin Sandbox and database query tool.
-    Restricted to Supervisors. Client-side JS blocks non-admins, but we can also guard here.
+    Restricted to Rovex Admins only. Client-side JS blocks non-admins, but we can also guard here.
     """
     return HTMLResponse(content=_load_template("admin.html"))
 
