@@ -72,7 +72,7 @@ def serve_index_page(request: Request):
     """
     Renders the unified landing page and login panel.
     """
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="index.html")
 
 
 @app.get("/core", response_class=HTMLResponse)
@@ -82,7 +82,7 @@ def serve_core_platform_page(request: Request):
     Uses browser client guard to verify authentications, but can also inspect cookies.
     """
     # Simply render template; client-side JS handles token decoding and RBAC verification
-    return templates.TemplateResponse("core_platform.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="core_platform.html")
 
 
 @app.get("/admin", response_class=HTMLResponse)
@@ -91,7 +91,7 @@ def serve_admin_platform_page(request: Request):
     Renders the Admin Sandbox and database query tool.
     Restricted to Supervisors. Client-side JS blocks non-admins, but we can also guard here.
     """
-    return templates.TemplateResponse("admin.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="admin.html")
 
 
 # =====================================================================
