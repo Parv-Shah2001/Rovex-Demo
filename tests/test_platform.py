@@ -296,6 +296,8 @@ class TestRovexPlatform(unittest.TestCase):
         self.assertIn("md:h-screen", html)
         self.assertIn("md:overflow-hidden", html)
         self.assertIn("min-w-0 min-h-0", html)
+        self.assertIn("md:w-1/2", html)
+        self.assertIn("flex-grow min-h-0 flex flex-col md:flex-row overflow-hidden", html)
 
     def test_template_loader_refreshes_changed_html_files(self):
         """
