@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rovex Hospital Robotics Backend Portal</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+        }
+    </style>
+</head>
+<body class="min-h-screen text-slate-100 flex flex-col justify-between">
+
+    <!-- Header -->
+    <header class="border-b border-slate-800 bg-slate-900/60 backdrop-blur-md sticky top-0 z-50 px-6 py-4">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                    <i class="fa-solid fa-robot text-xl text-white"></i>
+                </div>
+                <div>
+                    <span class="text-xl font-bold tracking-tight bg-gradient-to-r from-white to-indigo-300 bg-clip-text text-transparent">ROVEX</span>
+                    <span class="text-xs block text-slate-400 font-medium tracking-wider uppercase">Hospital Fleet Systems</span>
+                </div>
+            </div>
+            <div class="text-xs text-indigo-400 font-mono bg-indigo-950/40 border border-indigo-900/50 px-3 py-1.5 rounded-lg">
+                <i class="fa-solid fa-circle-dot animate-pulse mr-1.5"></i> Platform Live (UTC: 2026-07-31)
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-grow flex items-center justify-center px-4 py-12">
+        <div class="max-w-4xl w-full grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
+            
+            <!-- Left Panel: Pitch and Tech Info -->
+            <div class="space-y-6">
+                <span class="text-xs font-bold uppercase tracking-widest text-indigo-400 px-3 py-1 bg-indigo-950/80 rounded-full border border-indigo-800/40">Demo Platform</span>
+                <h1 class="text-4xl md:text-5xl font-extrabold tracking-tight leading-tight">
+                    Hospital <span class="bg-gradient-to-r from-indigo-400 to-cyan-300 bg-clip-text text-transparent">Stretcher Robots</span> Fleet Orchestrator.
+                </h1>
+                <p class="text-slate-400 leading-relaxed">
+                    Designed as a modular monolith. This platform models complete concurrent telemetry ingestion (Pydantic), in-memory SQLite relational user databases (SQLAlchemy), robust mock document logs (PyMongo), and live macro-route navigation utilizing the A* pathfinding algorithm.
+                </p>
+                
+                <!-- Architecture list -->
+                <div class="space-y-3 pt-2">
+                    <div class="flex items-start space-x-3">
+                        <div class="p-1.5 bg-slate-800 rounded-lg text-emerald-400"><i class="fa-solid fa-database w-5 text-center"></i></div>
+                        <div>
+                            <h4 class="text-sm font-semibold">Dual Storage Design</h4>
+                            <p class="text-xs text-slate-400">Postgres SQL simulation for OLTP & Mock MongoDB for telemetry/profiles.</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start space-x-3">
+                        <div class="p-1.5 bg-slate-800 rounded-lg text-indigo-400"><i class="fa-solid fa-route w-5 text-center"></i></div>
+                        <div>
+                            <h4 class="text-sm font-semibold">Active Macro-Routing</h4>
+                            <p class="text-xs text-slate-400">Integrated A* pathfinder with editable edge weights to avoid busy hallways.</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start space-x-3">
+                        <div class="p-1.5 bg-slate-800 rounded-lg text-cyan-400"><i class="fa-solid fa-shield-halved w-5 text-center"></i></div>
+                        <div>
+                            <h4 class="text-sm font-semibold">Hierarchical RBAC Authorization</h4>
+                            <p class="text-xs text-slate-400">Secure cryptographic token validation (HMAC-SHA256) for Supervisors, Sub-Supervisors, and Employees.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Panel: Login card -->
+            <div class="bg-slate-900/80 border border-slate-800 p-8 rounded-2xl shadow-2xl relative overflow-hidden backdrop-blur-md">
+                <div class="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl"></div>
+                
+                <h2 class="text-2xl font-bold mb-2">Sign in to St. Jude Hospital</h2>
+                <p class="text-xs text-slate-400 mb-6">Select a pre-configured profile to authenticate into the system with specific permissions.</p>
+
+                <!-- Credentials Selector Buttons -->
+                <div class="space-y-3 mb-6">
+                    <button onclick="fillAndLogin('admin', 'adminpassword')" class="w-full text-left p-3.5 bg-indigo-950/20 hover:bg-indigo-950/40 border border-indigo-900/60 hover:border-indigo-700 rounded-xl transition duration-200 flex items-center justify-between group">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-8 h-8 rounded-lg bg-indigo-900/60 flex items-center justify-center text-indigo-300 group-hover:scale-105 transition"><i class="fa-solid fa-user-shield"></i></div>
+                            <div>
+                                <h4 class="text-xs font-bold text-white">Dr. Sarah Mitchell</h4>
+                                <p class="text-[10px] text-slate-400">Supervisor / Admin (Full Access)</p>
+                            </div>
+                        </div>
+                        <i class="fa-solid fa-chevron-right text-xs text-indigo-500"></i>
+                    </button>
+
+                    <button onclick="fillAndLogin('sub_sarah', 'subpassword')" class="w-full text-left p-3.5 bg-slate-800/30 hover:bg-slate-800/60 border border-slate-700/60 hover:border-slate-500 rounded-xl transition duration-200 flex items-center justify-between group">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-8 h-8 rounded-lg bg-slate-700/60 flex items-center justify-center text-slate-300 group-hover:scale-105 transition"><i class="fa-solid fa-user-gear"></i></div>
+                            <div>
+                                <h4 class="text-xs font-bold text-white">Nurse Thomas Kelly</h4>
+                                <p class="text-[10px] text-slate-400">Sub-Supervisor (Schedule & Transit View)</p>
+                            </div>
+                        </div>
+                        <i class="fa-solid fa-chevron-right text-xs text-slate-500"></i>
+                    </button>
+
+                    <button onclick="fillAndLogin('emp_john', 'emppassword')" class="w-full text-left p-3.5 bg-slate-800/30 hover:bg-slate-800/60 border border-slate-700/60 hover:border-slate-500 rounded-xl transition duration-200 flex items-center justify-between group">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-8 h-8 rounded-lg bg-slate-700/60 flex items-center justify-center text-slate-300 group-hover:scale-105 transition"><i class="fa-solid fa-user"></i></div>
+                            <div>
+                                <h4 class="text-xs font-bold text-white">Orderly John Doe</h4>
+                                <p class="text-[10px] text-slate-400">Employee (Viewer Only / Access Request)</p>
+                            </div>
+                        </div>
+                        <i class="fa-solid fa-chevron-right text-xs text-slate-500"></i>
+                    </button>
+                </div>
+
+                <div class="relative flex py-2 items-center">
+                    <div class="flex-grow border-t border-slate-800"></div>
+                    <span class="flex-shrink mx-3 text-[10px] text-slate-500 uppercase tracking-widest font-bold">Or raw input</span>
+                    <div class="flex-grow border-t border-slate-800"></div>
+                </div>
+
+                <!-- Fallback Form -->
+                <form id="loginForm" class="space-y-4 mt-4">
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5" for="username">Username</label>
+                        <input class="w-full bg-slate-950/80 border border-slate-800 focus:border-indigo-500 focus:outline-none px-4 py-2.5 rounded-xl text-sm" type="text" id="username" placeholder="e.g., admin" required>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5" for="password">Password</label>
+                        <input class="w-full bg-slate-950/80 border border-slate-800 focus:border-indigo-500 focus:outline-none px-4 py-2.5 rounded-xl text-sm" type="password" id="password" placeholder="••••••••" required>
+                    </div>
+
+                    <div id="errorBox" class="hidden text-xs bg-rose-500/10 border border-rose-500/20 text-rose-400 p-3 rounded-lg flex items-center space-x-2">
+                        <i class="fa-solid fa-circle-exclamation"></i>
+                        <span id="errorMessage">Invalid credentials.</span>
+                    </div>
+
+                    <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 py-3 rounded-xl font-semibold text-sm transition shadow-lg shadow-indigo-600/10 hover:shadow-indigo-600/25">
+                        Authenticate credentials <i class="fa-solid fa-arrow-right ml-1"></i>
+                    </button>
+                </form>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-800/60 bg-slate-950 px-6 py-6 text-center text-xs text-slate-500">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+            <div>
+                &copy; 2026 Rovex Robotics Inc. Systems Backend Prototype.
+            </div>
+            <div class="flex space-x-4">
+                <span class="hover:text-slate-300">FastAPI</span>
+                <span>&bull;</span>
+                <span class="hover:text-slate-300">SQLAlchemy (SQLite)</span>
+                <span>&bull;</span>
+                <span class="hover:text-slate-300">PyMongo (Mock)</span>
+                <span>&bull;</span>
+                <span class="hover:text-slate-300">A* Pathfinder</span>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Form submissions
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const u = document.getElementById('username').value;
+            const p = document.getElementById('password').value;
+            await runLogin(u, p);
+        });
+
+        // Fast helper auto click
+        async function fillAndLogin(username, password) {
+            document.getElementById('username').value = username;
+            document.getElementById('password').value = password;
+            await runLogin(username, password);
+        }
+
+        // Login fetch action
+        async function runLogin(username, password) {
+            const errorBox = document.getElementById('errorBox');
+            errorBox.classList.add('hidden');
+            
+            try {
+                const response = await fetch('/api/users/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await response.json();
+                if (response.ok) {
+                    // Successfully logged in! Re-route based on role
+                    // Save credentials to localStorage
+                    localStorage.setItem('rovex_token', data.access_token);
+                    localStorage.setItem('rovex_user', JSON.stringify(data.user));
+                    
+                    // Redirect to corresponding page based on role:
+                    // Supervisors can view both Admin panel and Core platform. Let's redirect to core platform with quick options.
+                    if (data.user.role === 'supervisor') {
+                        window.location.href = '/core';
+                    } else {
+                        window.location.href = '/core';
+                    }
+                } else {
+                    errorBox.classList.remove('hidden');
+                    document.getElementById('errorMessage').innerText = data.detail || 'Failed to authenticate.';
+                }
+            } catch (err) {
+                errorBox.classList.remove('hidden');
+                document.getElementById('errorMessage').innerText = 'Network error contacting backend platform.';
+                console.error(err);
+            }
+        }
+    </script>
+</body>
+</html>

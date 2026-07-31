@@ -1,0 +1,1012 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rovex Core Platform - Hospital Fleet Systems</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap');
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #0b0f19;
+        }
+        .font-mono-custom {
+            font-family: 'Fira Code', monospace;
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+    </style>
+</head>
+<body class="text-slate-100 min-h-screen flex overflow-hidden">
+
+    <!-- Sidebar (Gemini Style) -->
+    <aside class="w-80 bg-slate-950 border-r border-slate-900 flex flex-col justify-between shrink-0 hidden md:flex">
+        <div class="p-6 space-y-6 flex-grow overflow-y-auto">
+            
+            <!-- Company Logo -->
+            <div class="flex items-center space-x-3 pb-4 border-b border-slate-900">
+                <div class="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center shadow-lg">
+                    <i class="fa-solid fa-robot text-base text-white"></i>
+                </div>
+                <div>
+                    <h2 class="text-base font-bold tracking-tight">ROVEX CORE</h2>
+                    <span class="text-[9px] block text-slate-500 uppercase tracking-widest font-semibold">St. Jude Hospital</span>
+                </div>
+            </div>
+
+            <!-- Active User Card with RBAC badge -->
+            <div class="bg-slate-900/40 border border-slate-800/80 p-4 rounded-xl space-y-2">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center border border-indigo-500/30 text-indigo-400 font-bold text-sm">
+                        <span id="userInitials">U</span>
+                    </div>
+                    <div>
+                        <h4 id="userName" class="text-xs font-bold text-white">...</h4>
+                        <span id="userRoleBadge" class="text-[9px] font-bold px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">...</span>
+                    </div>
+                </div>
+                <div id="adminPortalBtn" class="hidden pt-1.5">
+                    <a href="/admin" class="w-full text-center block py-1.5 rounded bg-violet-600 hover:bg-violet-500 text-white text-[10px] font-bold tracking-wider uppercase transition">
+                        <i class="fa-solid fa-shield-halved mr-1"></i> Admin Sandbox Platform
+                    </a>
+                </div>
+            </div>
+
+            <!-- Active / Ongoing Missions List -->
+            <div class="space-y-3">
+                <div class="flex justify-between items-center text-xs">
+                    <span class="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Ongoing Tasks</span>
+                    <button onclick="fetchTasks()" class="text-[10px] text-indigo-400 hover:text-indigo-300 font-semibold"><i class="fa-solid fa-rotate-right"></i></button>
+                </div>
+                
+                <div class="space-y-2" id="ongoingMissionsList">
+                    <!-- Loaded dynamically -->
+                    <div class="text-center py-4 text-xs text-slate-600">No active tasks.</div>
+                </div>
+            </div>
+
+            <!-- Pre-set Corridor Weights List (Fleet Orchestration) -->
+            <div class="space-y-3">
+                <div class="flex justify-between items-center text-xs">
+                    <span class="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Corridor Traffic Priority</span>
+                    <button onclick="openWeightModal()" class="text-[10px] text-indigo-400 hover:text-indigo-300 font-semibold"><i class="fa-solid fa-plus mr-0.5"></i> Update</button>
+                </div>
+                <div class="text-slate-500 text-[11px] leading-relaxed">
+                    By default, nodes represent real physical meters. You can increase node weights (e.g. during 2pm-4pm corridor rush hours) to reroute robots through quieter paths.
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Sidebar footer -->
+        <div class="p-6 border-t border-slate-900 bg-slate-950 flex justify-between items-center text-xs text-slate-500">
+            <span>Rovex Core v2.4</span>
+            <button onclick="handleLogout()" class="hover:text-rose-400"><i class="fa-solid fa-right-from-bracket"></i> Sign out</button>
+        </div>
+    </aside>
+
+    <!-- Main Central Panel (Gemini Chat & Interactive Graph) -->
+    <main class="flex-grow flex flex-col justify-between overflow-hidden">
+        
+        <!-- Header -->
+        <header class="h-16 border-b border-slate-900 bg-slate-950/40 px-6 flex justify-between items-center">
+            <div class="flex items-center space-x-2 md:hidden">
+                <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center">
+                    <i class="fa-solid fa-robot text-sm text-white"></i>
+                </div>
+                <span class="text-sm font-bold tracking-wider">ROVEX</span>
+            </div>
+            <div class="text-xs text-slate-400 flex items-center space-x-2 font-mono-custom">
+                <span class="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-ping"></span>
+                <span>Active Core Station (UTC: 2026-07-31)</span>
+            </div>
+            <div class="flex items-center space-x-2 md:hidden">
+                <button onclick="handleLogout()" class="text-xs text-slate-400 hover:text-rose-400"><i class="fa-solid fa-right-from-bracket"></i></button>
+            </div>
+        </header>
+
+        <!-- Dynamic Body Area: Left Side Chat, Right Side Graph Map -->
+        <div class="flex-grow flex flex-col lg:flex-row overflow-hidden">
+            
+            <!-- Gemini-like Chat & Task Section -->
+            <div class="w-full lg:w-1/2 flex flex-col justify-between border-r border-slate-900 overflow-y-auto p-6 space-y-6">
+                
+                <!-- Gemini Welcome screen / Conversation container -->
+                <div class="flex-grow flex flex-col justify-end space-y-6 min-h-0" id="chatArea">
+                    
+                    <!-- Welcome header (if empty) -->
+                    <div id="welcomeContainer" class="space-y-4 my-auto">
+                        <span class="text-4xl md:text-5xl font-extrabold tracking-tight bg-gradient-to-r from-blue-400 via-indigo-300 to-purple-400 bg-clip-text text-transparent block">
+                            Hello, <span id="welcomeName">Staff</span>.
+                        </span>
+                        <h3 class="text-xl md:text-2xl font-semibold text-slate-300">How can I help orchestrate the hospital fleet today?</h3>
+                        <p class="text-xs text-slate-400 leading-relaxed max-w-lg">
+                            Ask me to dispatch stretcher robots, query active sensors, or divert transits. Integrated directly with the SQL user roles and NoSQL robot endpoints.
+                        </p>
+                        
+                        <!-- Quick Start suggestions -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-4">
+                            <button onclick="useQuickPrompt('Schedule transit from Reception to ICU')" class="p-4 bg-slate-950 hover:bg-slate-900 border border-slate-900 hover:border-slate-800 rounded-xl text-left transition duration-200 group">
+                                <h4 class="text-xs font-bold text-slate-300 group-hover:text-white">Dispatch Robot</h4>
+                                <p class="text-[10px] text-slate-500 mt-1">Schedule transport from Reception to ICU using optimal path routing.</p>
+                            </button>
+                            <button onclick="useQuickPrompt('List active hospital robots')" class="p-4 bg-slate-950 hover:bg-slate-900 border border-slate-900 hover:border-slate-800 rounded-xl text-left transition duration-200 group">
+                                <h4 class="text-xs font-bold text-slate-300 group-hover:text-white">Query Telemetry</h4>
+                                <p class="text-[10px] text-slate-500 mt-1">Scan NoSQL profiles to check batteries, serial numbers, and locations.</p>
+                            </button>
+                            <button onclick="openScheduleModal()" class="p-4 bg-slate-950 hover:bg-slate-900 border border-slate-900 hover:border-slate-800 rounded-xl text-left transition duration-200 group">
+                                <h4 class="text-xs font-bold text-slate-300 group-hover:text-white">Interactive Scheduler <i class="fa-solid fa-calendar-plus text-indigo-500 ml-1"></i></h4>
+                                <p class="text-[10px] text-slate-500 mt-1">Deploy tasks with recurring triggers, custom routes, and robot lists.</p>
+                            </button>
+                            <button onclick="openServiceModal()" class="p-4 bg-slate-950 hover:bg-slate-900 border border-slate-900 hover:border-slate-800 rounded-xl text-left transition duration-200 group">
+                                <h4 class="text-xs font-bold text-slate-300 group-hover:text-white">Maintenance Ticket <i class="fa-solid fa-wrench text-rose-500 ml-1"></i></h4>
+                                <p class="text-[10px] text-slate-500 mt-1">Un-sanction robots or log physical hardware problems.</p>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Simulated Chat History (when used) -->
+                    <div id="chatHistory" class="hidden space-y-4 overflow-y-auto max-h-[28rem] pr-2">
+                        <!-- Messages loaded dynamically -->
+                    </div>
+
+                </div>
+
+                <!-- Chat Input (Gemini Bottom bar) -->
+                <div class="space-y-2">
+                    <form id="chatForm" class="relative">
+                        <input id="chatInput" type="text" class="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-indigo-500 focus:outline-none pl-5 pr-14 py-4 rounded-2xl text-xs placeholder-slate-500 text-slate-200 transition" placeholder="Ask Rovex AI or schedule tasks (e.g. 'schedule from Reception to Ward 1')...">
+                        <button type="submit" class="absolute right-3 top-3 w-10 h-10 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white flex items-center justify-center transition">
+                            <i class="fa-solid fa-paper-plane text-xs"></i>
+                        </button>
+                    </form>
+                    <div class="flex justify-between items-center px-2">
+                        <span class="text-[10px] text-slate-500">Inputs are parsed programmatically against live REST endpoints.</span>
+                        <button onclick="clearChat()" class="text-[10px] text-slate-400 hover:text-slate-200 underline">Clear chat</button>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Hospital Map & A* Pathfinder Visualization -->
+            <div class="w-full lg:w-1/2 flex flex-col justify-between p-6 space-y-6 overflow-y-auto bg-slate-950/20">
+                
+                <!-- Section Header -->
+                <div class="border-b border-slate-900 pb-3">
+                    <h3 class="font-bold text-sm flex items-center space-x-2">
+                        <i class="fa-solid fa-map-location-dot text-indigo-400"></i>
+                        <span>Hospital Layout & A* Pathfinding Grid</span>
+                    </h3>
+                    <p class="text-[11px] text-slate-500">Live coordinates in meters. Green = Nodes, Bright Line = Simulated Optimal Transit Route.</p>
+                </div>
+
+                <!-- Canvas Visualizer Container -->
+                <div class="relative bg-black/40 border border-slate-900 rounded-2xl p-4 flex items-center justify-center min-h-[18rem] lg:min-h-[22rem]">
+                    <canvas id="hospitalCanvas" width="500" height="400" class="w-full h-auto bg-slate-950/30 rounded-xl max-w-lg"></canvas>
+                    
+                    <div class="absolute bottom-3 left-4 flex space-x-3 text-[10px]">
+                        <span class="flex items-center text-indigo-400 font-bold"><span class="w-2.5 h-2.5 bg-indigo-500 rounded-full mr-1"></span> Path planned</span>
+                        <span class="flex items-center text-slate-400"><span class="w-2.5 h-2.5 bg-slate-500 rounded-full mr-1"></span> Connection</span>
+                        <span class="flex items-center text-emerald-400"><span class="w-2.5 h-2.5 bg-emerald-500 rounded-full mr-1"></span> Transit step</span>
+                    </div>
+                </div>
+
+                <!-- A* Pathfinder Diagnostics (Explaining "How the algorithm works") -->
+                <div class="bg-slate-950 border border-slate-900 rounded-2xl p-5 space-y-3">
+                    <h4 class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center justify-between">
+                        <span><i class="fa-solid fa-route text-violet-400 mr-1.5"></i> A* Pathfinder Diagnostics</span>
+                        <span id="patherStatus" class="font-mono text-[9px] px-2 py-0.5 rounded bg-slate-900 text-slate-400">No active path</span>
+                    </h4>
+                    
+                    <div class="grid grid-cols-3 gap-3 text-center border-b border-slate-900 pb-3 text-xs">
+                        <div class="bg-slate-900/40 p-2.5 rounded-lg border border-slate-900">
+                            <span class="text-[10px] text-slate-500 block">Total Actual Distance</span>
+                            <span id="patherDist" class="font-bold text-white">-</span>
+                        </div>
+                        <div class="bg-slate-900/40 p-2.5 rounded-lg border border-slate-900">
+                            <span class="text-[10px] text-slate-500 block">Relative Cost Score</span>
+                            <span id="patherCost" class="font-bold text-white">-</span>
+                        </div>
+                        <div class="bg-slate-900/40 p-2.5 rounded-lg border border-slate-900">
+                            <span class="text-[10px] text-slate-500 block">Nodes Checked</span>
+                            <span id="patherSteps" class="font-bold text-white">-</span>
+                        </div>
+                    </div>
+
+                    <!-- Steps display -->
+                    <div class="space-y-1.5">
+                        <span class="text-[10px] uppercase font-bold text-slate-400">Optimal Path Sequence:</span>
+                        <div id="pathDisplay" class="font-mono-custom text-xs bg-slate-900 p-2.5 rounded-lg text-emerald-400 border border-slate-800">No calculation loaded. Start a task to run the pathfinder!</div>
+                    </div>
+
+                    <div class="space-y-1.5">
+                        <span class="text-[10px] uppercase font-bold text-slate-400">Open-Set Heuristic Calculations (f = g + h):</span>
+                        <div id="heuristicConsole" class="text-[10px] font-mono-custom text-slate-500 h-24 overflow-y-auto bg-slate-950 border border-slate-900 p-2.5 rounded-lg whitespace-pre leading-relaxed">Wait for A* calculations to inspect f(n) valuations...</div>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- 1. Interactive Scheduler Modal -->
+    <div id="scheduleModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm hidden px-4">
+        <div class="bg-slate-900 border border-slate-800 max-w-md w-full rounded-2xl p-6 space-y-4">
+            <div class="flex justify-between items-center pb-2 border-b border-slate-800">
+                <h3 class="font-bold text-sm flex items-center space-x-2">
+                    <i class="fa-solid fa-calendar-plus text-indigo-400"></i>
+                    <span>Schedule Transit Transport Task</span>
+                </h3>
+                <button onclick="closeScheduleModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <form id="schedulerForm" class="space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5" for="sourceNode">Departing Node</label>
+                        <select id="sourceNode" class="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 focus:outline-none px-3 py-2 rounded-xl text-xs" required></select>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5" for="targetNode">Target Node</label>
+                        <select id="targetNode" class="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 focus:outline-none px-3 py-2 rounded-xl text-xs" required></select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5" for="assignRobot">Assign Fleet Robot (Optional)</label>
+                    <select id="assignRobot" class="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 focus:outline-none px-3 py-2 rounded-xl text-xs">
+                        <option value="">Auto-assign (Idle with highest battery)</option>
+                    </select>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5" for="scheduledTime">Scheduled Time</label>
+                        <input id="scheduledTime" type="text" class="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 focus:outline-none px-3 py-2 rounded-xl text-xs" value="now">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5" for="isRecurring">Recurring Task</label>
+                        <div class="flex items-center space-x-2 mt-1">
+                            <input id="isRecurring" type="checkbox" onchange="toggleRecurrence()" class="w-4 h-4 bg-slate-950 border border-slate-800 text-indigo-600 rounded focus:ring-indigo-500 focus:ring-offset-slate-900 focus:outline-none">
+                            <span class="text-xs text-slate-400">Yes, repeating</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="recurrenceSelector" class="hidden">
+                    <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5" for="recurrenceInterval">Recurrence Interval</label>
+                    <select id="recurrenceInterval" class="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 focus:outline-none px-3 py-2 rounded-xl text-xs">
+                        <option value="none">None</option>
+                        <option value="hourly">Hourly</option>
+                        <option value="daily">Daily</option>
+                    </select>
+                </div>
+
+                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-xl text-xs transition">
+                    Dispatch Stretcher Robot <i class="fa-solid fa-chevron-right ml-1"></i>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 2. Maintenance / Service Request Modal -->
+    <div id="serviceModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm hidden px-4">
+        <div class="bg-slate-900 border border-slate-800 max-w-md w-full rounded-2xl p-6 space-y-4">
+            <div class="flex justify-between items-center pb-2 border-b border-slate-800">
+                <h3 class="font-bold text-sm flex items-center space-x-2">
+                    <i class="fa-solid fa-wrench text-rose-400"></i>
+                    <span>Log Robot Maintenance Ticket</span>
+                </h3>
+                <button onclick="closeServiceModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <form id="serviceForm" class="space-y-4">
+                <div>
+                    <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5" for="serviceRobot">Select Faulty Robot</label>
+                    <select id="serviceRobot" class="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 focus:outline-none px-3 py-2 rounded-xl text-xs" required></select>
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5" for="issueDescription">Issue Description / Symptoms</label>
+                    <textarea id="issueDescription" rows="4" class="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 focus:outline-none p-3 rounded-xl text-xs" placeholder="e.g. Wheel slipping on slope, camera 2 obstruction alarm, lidar requires offline recalibration." required></textarea>
+                </div>
+
+                <button type="submit" class="w-full bg-rose-600 hover:bg-rose-500 text-white font-bold py-2.5 rounded-xl text-xs transition">
+                    Submit Maintenance Ticket <i class="fa-solid fa-triangle-exclamation ml-1"></i>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 3. Dynamic Corridor Weights Modal -->
+    <div id="weightModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm hidden px-4">
+        <div class="bg-slate-900 border border-slate-800 max-w-md w-full rounded-2xl p-6 space-y-4">
+            <div class="flex justify-between items-center pb-2 border-b border-slate-800">
+                <h3 class="font-bold text-sm flex items-center space-x-2">
+                    <i class="fa-solid fa-route text-violet-400"></i>
+                    <span>Adjust Corridor Transit Weight</span>
+                </h3>
+                <button onclick="closeWeightModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <form id="weightForm" class="space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5" for="weightNodeA">Node A</label>
+                        <select id="weightNodeA" class="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 focus:outline-none px-3 py-2 rounded-xl text-xs" required></select>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5" for="weightNodeB">Node B</label>
+                        <select id="weightNodeB" class="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 focus:outline-none px-3 py-2 rounded-xl text-xs" required></select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5" for="weightVal">Cost Weight (Higher cost = lower dispatch priority)</label>
+                    <input id="weightVal" type="number" step="0.5" min="1" class="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 focus:outline-none px-3 py-2 rounded-xl text-xs" value="5.0" required>
+                    <p class="text-[9px] text-slate-500 mt-1">Increasing weight forces the A* algorithm to bypass this corridor in favor of shorter-travel paths.</p>
+                </div>
+
+                <div id="weightRbacWarning" class="hidden text-xs bg-rose-500/10 text-rose-400 p-3 rounded-lg border border-rose-500/20">
+                    <i class="fa-solid fa-lock mr-1"></i> Your current Role cannot modify edge weights. Supervisors or Sub-supervisors only can configure corridor weights.
+                </div>
+
+                <button id="weightSubmitBtn" type="submit" class="w-full bg-violet-600 hover:bg-violet-500 text-white font-bold py-2.5 rounded-xl text-xs transition">
+                    Modify Edge Weight
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('rovex_token');
+        const userObj = JSON.parse(localStorage.getItem('rovex_user') || '{}');
+        
+        let nodesLayout = {};
+        let edgesLayout = [];
+        let canvas, ctx;
+
+        // On Load
+        window.addEventListener('DOMContentLoaded', async () => {
+            // Check auth
+            if (!token || !userObj.username) {
+                alert("Session expired. Please log in first.");
+                window.location.href = '/';
+                return;
+            }
+
+            // Fill header and profile card details
+            document.getElementById('userName').innerText = userObj.full_name;
+            document.getElementById('welcomeName').innerText = userObj.full_name.split(' ')[1] || userObj.full_name;
+            document.getElementById('userRoleBadge').innerText = userObj.role.toUpperCase();
+            document.getElementById('userInitials').innerText = userObj.full_name.split(' ').map(n => n[0]).join('');
+
+            // Hide/Show Admin Dashboard link based on role
+            if (userObj.role === 'supervisor') {
+                document.getElementById('adminPortalBtn').classList.remove('hidden');
+            }
+
+            // Set up Canvas
+            canvas = document.getElementById('hospitalCanvas');
+            ctx = canvas.getContext('2d');
+
+            // Load data
+            await fetchMapLayout();
+            await fetchTasks();
+            await fillFormSelectors();
+        });
+
+        // Logout
+        function handleLogout() {
+            localStorage.clear();
+            document.cookie = "access_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+            window.location.href = '/';
+        }
+
+        // Toggle Recurrence input
+        function toggleRecurrence() {
+            const checked = document.getElementById('isRecurring').checked;
+            const target = document.getElementById('recurrenceSelector');
+            if (checked) {
+                target.classList.remove('hidden');
+            } else {
+                target.classList.add('hidden');
+            }
+        }
+
+        // Modals management
+        function openScheduleModal() {
+            document.getElementById('scheduleModal').classList.remove('hidden');
+        }
+        function closeScheduleModal() {
+            document.getElementById('scheduleModal').classList.add('hidden');
+        }
+        function openServiceModal() {
+            document.getElementById('serviceModal').classList.remove('hidden');
+        }
+        function closeServiceModal() {
+            document.getElementById('serviceModal').classList.add('hidden');
+        }
+        function openWeightModal() {
+            const modal = document.getElementById('weightModal');
+            const submitBtn = document.getElementById('weightSubmitBtn');
+            const rbacWarning = document.getElementById('weightRbacWarning');
+            
+            modal.classList.remove('hidden');
+            
+            // Check RBAC
+            if (userObj.role !== 'supervisor' && userObj.role !== 'sub-supervisor') {
+                submitBtn.disabled = true;
+                submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                rbacWarning.classList.remove('hidden');
+            }
+        }
+        function closeWeightModal() {
+            document.getElementById('weightModal').classList.add('hidden');
+        }
+
+        // Clear Conversation Log
+        function clearChat() {
+            const chatHistory = document.getElementById('chatHistory');
+            const welcome = document.getElementById('welcomeContainer');
+            chatHistory.innerHTML = '';
+            chatHistory.classList.add('hidden');
+            welcome.classList.remove('hidden');
+        }
+
+        // Auto fills dropdown options
+        async function fillFormSelectors() {
+            const nodes = Object.keys(nodesLayout);
+            
+            const sourceSelect = document.getElementById('sourceNode');
+            const targetSelect = document.getElementById('targetNode');
+            const weightA = document.getElementById('weightNodeA');
+            const weightB = document.getElementById('weightNodeB');
+            
+            sourceSelect.innerHTML = '';
+            targetSelect.innerHTML = '';
+            weightA.innerHTML = '';
+            weightB.innerHTML = '';
+
+            nodes.forEach(n => {
+                sourceSelect.add(new Option(n, n));
+                targetSelect.add(new Option(n, n));
+                weightA.add(new Option(n, n));
+                weightB.add(new Option(n, n));
+            });
+            // default offsets
+            targetSelect.selectedIndex = 1;
+            weightB.selectedIndex = 1;
+
+            // Load robot list options
+            try {
+                const res = await fetch('/api/robots', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    const robots = await res.json();
+                    const rSelect = document.getElementById('assignRobot');
+                    const sSelect = document.getElementById('serviceRobot');
+                    rSelect.innerHTML = '<option value="">Auto-assign (Idle with highest battery)</option>';
+                    sSelect.innerHTML = '';
+                    robots.forEach(r => {
+                        if (r.sanctioned && r.status === 'idle') {
+                            rSelect.add(new Option(`${r.robot_id} (${r.battery}%)`, r.robot_id));
+                        }
+                        sSelect.add(new Option(r.robot_id, r.robot_id));
+                    });
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        // Fetch hospital floor map coordinates
+        async function fetchMapLayout() {
+            try {
+                const res = await fetch('/api/robots/graph/layout', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    nodesLayout = data.nodes;
+                    edgesLayout = data.edges;
+                    drawMap();
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        // Draw 2D hospital map coordinates to Canvas
+        function drawMap(highlightPath = []) {
+            if (!ctx) return;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Bounds for normalizing coordinates (hospital dimensions are roughly 15x15 meters)
+            const margin = 50;
+            const xMin = -1, xMax = 12, yMin = -1, yMax = 16;
+            const scaleX = (canvas.width - 2 * margin) / (xMax - xMin);
+            const scaleY = (canvas.height - 2 * margin) / (yMax - yMin);
+
+            const mapX = (x) => margin + (x - xMin) * scaleX;
+            const mapY = (y) => canvas.height - margin - (y - yMin) * scaleY; // flip Y for standard screen space
+
+            // 1. Draw connections / corridors (edges)
+            ctx.strokeStyle = '#1e293b';
+            ctx.lineWidth = 2.5;
+            edgesLayout.forEach(edge => {
+                const p1 = nodesLayout[edge.from];
+                const p2 = nodesLayout[edge.to];
+                if (p1 && p2) {
+                    ctx.beginPath();
+                    ctx.moveTo(mapX(p1.x), mapY(p1.y));
+                    ctx.lineTo(mapX(p2.x), mapY(p2.y));
+                    ctx.stroke();
+                    
+                    // Render weight metric text midway
+                    ctx.fillStyle = '#64748b';
+                    ctx.font = '9px Fira Code';
+                    const midX = (mapX(p1.x) + mapX(p2.x)) / 2;
+                    const midY = (mapY(p1.y) + mapY(p2.y)) / 2;
+                    ctx.fillText(edge.weight, midX, midY - 4);
+                }
+            });
+
+            // 2. Draw active highlighted optimal route line (A* output)
+            if (highlightPath.length > 0) {
+                ctx.strokeStyle = '#6366f1'; // bright indigo
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                for (let i = 0; i < highlightPath.length; i++) {
+                    const p = nodesLayout[highlightPath[i]];
+                    if (p) {
+                        if (i === 0) {
+                            ctx.moveTo(mapX(p.x), mapY(p.y));
+                        } else {
+                            ctx.lineTo(mapX(p.x), mapY(p.y));
+                        }
+                    }
+                }
+                ctx.stroke();
+            }
+
+            // 3. Draw nodes
+            for (const [name, coord] of Object.entries(nodesLayout)) {
+                const isHighlighted = highlightPath.includes(name);
+                
+                // Outer glow
+                ctx.beginPath();
+                ctx.arc(mapX(coord.x), mapY(coord.y), isHighlighted ? 10 : 6, 0, 2 * Math.PI);
+                ctx.fillStyle = isHighlighted ? 'rgba(99, 102, 241, 0.25)' : 'rgba(16, 185, 129, 0.15)';
+                ctx.fill();
+
+                // Inner circle
+                ctx.beginPath();
+                ctx.arc(mapX(coord.x), mapY(coord.y), isHighlighted ? 5 : 4, 0, 2 * Math.PI);
+                ctx.fillStyle = isHighlighted ? '#6366f1' : '#10b981';
+                ctx.fill();
+
+                // Text labels
+                ctx.fillStyle = isHighlighted ? '#ffffff' : '#94a3b8';
+                ctx.font = isHighlighted ? 'bold 10px Plus Jakarta Sans' : '9px Plus Jakarta Sans';
+                ctx.fillText(name, mapX(coord.x) + 8, mapY(coord.y) + 3);
+            }
+        }
+
+        // Fetch user organization scheduled tasks
+        async function fetchTasks() {
+            try {
+                const res = await fetch('/api/tasks', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    const tasks = await res.json();
+                    
+                    // Filter for active (ongoing or pending) tasks
+                    const activeTasks = tasks.filter(t => t.status === 'ongoing' || t.status === 'pending');
+                    const taskListEl = document.getElementById('ongoingMissionsList');
+                    
+                    if (activeTasks.length === 0) {
+                        taskListEl.innerHTML = '<div class="text-center py-4 text-xs text-slate-600">No active tasks.</div>';
+                        return;
+                    }
+                    
+                    let html = '';
+                    activeTasks.forEach(t => {
+                        html += `
+                        <div class="bg-slate-900 border border-slate-800 p-3.5 rounded-xl space-y-2 relative group overflow-hidden">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <span class="text-[10px] font-mono-custom text-slate-500 font-bold uppercase block">${t.id}</span>
+                                    <span class="text-xs font-bold text-white">${t.source_node} &rarr; ${t.target_node}</span>
+                                </div>
+                                <span class="text-[9px] font-bold px-2 py-0.5 rounded ${
+                                    t.status === 'ongoing' ? 'bg-indigo-950 text-indigo-400 border border-indigo-900/30 animate-pulse' : 'bg-slate-800 text-slate-400'
+                                }">
+                                    ${t.status.toUpperCase()}
+                                </span>
+                            </div>
+
+                            <div class="flex items-center justify-between text-[10px] text-slate-400 pt-1">
+                                <span>Robot: <span class="font-bold text-slate-300 font-mono-custom">${t.robot_id || 'Auto-assigning'}</span></span>
+                                <span>ETA: <span class="font-bold text-emerald-400 font-mono-custom">${t.eta_minutes} min</span></span>
+                            </div>
+
+                            <!-- Controls for transit simulation -->
+                            <div class="flex space-x-2 pt-1.5 border-t border-slate-950">
+                                <button onclick="triggerTransitSimulation('${t.id}')" class="flex-grow text-center py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold transition">
+                                    <i class="fa-solid fa-play mr-1"></i> Simulate Transit Steps
+                                </button>
+                                <button onclick="cancelTask('${t.id}')" class="px-2 py-1.5 rounded bg-slate-950 hover:bg-rose-950/20 text-slate-500 hover:text-rose-400 border border-slate-800 transition">
+                                    <i class="fa-solid fa-ban"></i>
+                                </button>
+                            </div>
+                        </div>
+                        `;
+                    });
+                    taskListEl.innerHTML = html;
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        // Dispatch scheduler request
+        document.getElementById('schedulerForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const source_node = document.getElementById('sourceNode').value;
+            const target_node = document.getElementById('targetNode').value;
+            const robot_id = document.getElementById('assignRobot').value || null;
+            const scheduled_time = document.getElementById('scheduledTime').value;
+            const is_recurring = document.getElementById('isRecurring').checked;
+            const recurrence_interval = is_recurring ? document.getElementById('recurrenceInterval').value : 'none';
+
+            try {
+                const res = await fetch('/api/tasks', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ source_node, target_node, robot_id, scheduled_time, is_recurring, recurrence_interval })
+                });
+
+                if (res.ok) {
+                    const task = await res.json();
+                    closeScheduleModal();
+                    await fetchTasks();
+                    await fillFormSelectors();
+                    
+                    // Show inside canvas
+                    const path = JSON.parse(task.path);
+                    drawMap(path);
+                    await triggerPathfinderCalculation(source_node, target_node);
+                    
+                    // Append chat message
+                    appendChatBubble('Rovex AI Dispatcher', `Stretcher transport scheduled successfully under ID <span class="font-bold text-slate-200 font-mono-custom">${task.id}</span>. Optimal transit A* path generated: ${path.join(' &rarr; ')}. ETA computed at ${task.eta_minutes} minutes. Click "Simulate Transit Steps" in the sidebar to execute the hardware sequence!`, false);
+                } else {
+                    const err = await res.json();
+                    alert("Dispatched schedule failed: " + err.detail);
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        });
+
+        // Maintenance form submission
+        document.getElementById('serviceForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const robot_id = document.getElementById('serviceRobot').value;
+            const issue_description = document.getElementById('issueDescription').value;
+
+            try {
+                const res = await fetch('/api/tasks/service-request', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ robot_id, issue_description })
+                });
+
+                if (res.ok) {
+                    closeServiceModal();
+                    alert(`Maintenance request filed for ${robot_id}. This robot is now set to an emergency status 'error' and has been suspended from scheduled duties.`);
+                    await fillFormSelectors();
+                    appendChatBubble('Rovex AI Dispatcher', `Emergency Alert! Maintenance request successfully registered for robot <span class="font-bold font-mono-custom text-slate-200">${robot_id}</span>. Reason: "${issue_description}". The robot has been taken offline.`, false);
+                } else {
+                    const err = await res.json();
+                    alert(err.detail);
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        });
+
+        // Edge Weight modifying form submission
+        document.getElementById('weightForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const node_a = document.getElementById('weightNodeA').value;
+            const node_b = document.getElementById('weightNodeB').value;
+            const weight = parseFloat(document.getElementById('weightVal').value);
+
+            try {
+                const res = await fetch('/api/robots/graph/edge', {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ node_a, node_b, weight })
+                });
+
+                if (res.ok) {
+                    closeWeightModal();
+                    await fetchMapLayout();
+                    appendChatBubble('Rovex AI Dispatcher', `Orchestrator adjusted path weight: Corridor link [${node_a} <-> ${node_b}] has been updated to weight ${weight}. This will dynamically force robots onto lower-weighted paths.`, false);
+                } else {
+                    const err = await res.json();
+                    alert(err.detail);
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        });
+
+        // Cancel Task
+        async function cancelTask(taskId) {
+            if (!confirm(`Are you sure you want to cancel transport task ${taskId}?`)) return;
+            try {
+                const res = await fetch(`/api/tasks/${taskId}/cancel`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    await fetchTasks();
+                    await fillFormSelectors();
+                    appendChatBubble('Rovex AI Dispatcher', `Task ${taskId} was cancelled. Associated robot has been freed.`, false);
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        // Trigger step transit simulation (calls POST /api/tasks/{task_id}/execute)
+        async function triggerTransitSimulation(taskId) {
+            appendChatBubble('Rovex AI Dispatcher', `Starting real-time physical transit simulation for Task ${taskId}...`, false);
+            try {
+                const res = await fetch(`/api/tasks/${taskId}/execute`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    const task = await res.json();
+                    const path = JSON.parse(task.path);
+                    
+                    // Simulate visual step progress
+                    let stepIdx = 0;
+                    const interval = setInterval(() => {
+                        if (stepIdx < path.length) {
+                            const activeNodes = path.slice(0, stepIdx + 1);
+                            drawMap(activeNodes);
+                            stepIdx++;
+                        } else {
+                            clearInterval(interval);
+                            fetchTasks();
+                            fillFormSelectors();
+                            drawMap(path);
+                            appendChatBubble('Rovex AI Dispatcher', `Simulation Completed! Task ${taskId} successfully finished. Robot arrived at destination node <span class="font-bold text-white">${path[path.length - 1]}</span> and is now idling. Check Admin Logs for detailed logs.`, false);
+                        }
+                    }, 1000);
+                    
+                } else {
+                    const err = await res.json();
+                    alert("Transit simulation failed: " + err.detail);
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        // Run Path Finder Calculation Details visually
+        async function triggerPathfinderCalculation(start_node, goal_node) {
+            try {
+                const res = await fetch('/api/robots/path-planning', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ start_node, goal_node })
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    
+                    document.getElementById('patherStatus').innerText = "Path solved successfully!";
+                    document.getElementById('patherDist').innerText = data.total_distance_meters + 'm';
+                    document.getElementById('patherCost').innerText = data.total_cost;
+                    document.getElementById('patherSteps').innerText = data.steps_taken;
+                    
+                    document.getElementById('pathDisplay').innerHTML = data.path.join(' &rarr; ');
+                    
+                    // Format Heuristics log
+                    let hConsole = '';
+                    data.algorithm_steps.forEach((step, idx) => {
+                        hConsole += `[Step ${idx+1}] Node: ${step.current_node.padEnd(16)} | g(n)=${step.g_score.toFixed(1).padEnd(5)} | h(n)=${step.heuristic.toFixed(1).padEnd(5)} | f(n)=${step.f_score.toFixed(1).padEnd(5)}\n`;
+                    });
+                    document.getElementById('heuristicConsole').innerText = hConsole;
+                    
+                    drawMap(data.path);
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        // Gemini AI Assistant Chat Box Logic
+        document.getElementById('chatForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const input = document.getElementById('chatInput');
+            const prompt = input.value.trim();
+            if (!prompt) return;
+
+            input.value = '';
+            await executeAssistantCommand(prompt);
+        });
+
+        // Trigger prompt via bubble click
+        async function useQuickPrompt(text) {
+            await executeAssistantCommand(text);
+        }
+
+        // Parse user chat commands
+        async function executeAssistantCommand(prompt) {
+            // Hide welcome screen if showing
+            document.getElementById('welcomeContainer').classList.add('hidden');
+            const history = document.getElementById('chatHistory');
+            history.classList.remove('hidden');
+
+            // 1. User message bubble
+            appendChatBubble('Staff', prompt, true);
+
+            const prompt_lower = prompt.toLowerCase();
+
+            // Simple natural language commands parser
+            if (prompt_lower.includes('schedule from') || prompt_lower.includes('dispatch from') || prompt_lower.includes('schedule a transport')) {
+                // regex try: schedule from [NodeA] to [NodeB]
+                const regex = /(?:schedule|dispatch)(?:\s+a)?(?:\s+transport)?\s+from\s+([a-zA-Z0-9\s]+?)\s+to\s+([a-zA-Z0-9\s]+)/i;
+                const match = prompt.match(regex);
+                if (match) {
+                    const start = match[1].trim();
+                    const end = match[2].trim();
+                    
+                    // Verify if starting/ending nodes are real in our graph
+                    const validNodes = Object.keys(nodesLayout);
+                    const realStart = validNodes.find(n => n.toLowerCase() === start.toLowerCase());
+                    const realEnd = validNodes.find(n => n.toLowerCase() === end.toLowerCase());
+
+                    if (realStart && realEnd) {
+                        appendChatBubble('Rovex AI Assistant', `Processing task dispatch from ${realStart} to ${realEnd}... Calling REST scheduler...`, false);
+                        // Trigger actual schedule dispatch API
+                        await triggerTaskDispatchAPI(realStart, realEnd);
+                    } else {
+                        appendChatBubble('Rovex AI Assistant', `Sorry, could not verify the nodes. Real nodes available: ${validNodes.join(', ')}`, false);
+                    }
+                } else {
+                    appendChatBubble('Rovex AI Assistant', "To schedule, please specify clearly: 'schedule from Reception to Pharmacy' or select the 'Interactive Scheduler' above.", false);
+                }
+            } 
+            else if (prompt_lower.includes('robots') || prompt_lower.includes('list active') || prompt_lower.includes('show robots')) {
+                appendChatBubble('Rovex AI Assistant', "Scanning PyMongo database for live robot bios...", false);
+                await triggerListRobotsAPI();
+            } 
+            else if (prompt_lower.includes('divert') || prompt_lower.includes('congestion') || prompt_lower.includes('weight')) {
+                appendChatBubble('Rovex AI Assistant', "Routing configuration requested. You can adjust link priority weights by clicking the 'Update' button beside 'Corridor Traffic Priority' in the sidebar or calling PUT /api/robots/graph/edge.", false);
+            }
+            else {
+                // Default chatbot response
+                appendChatBubble('Rovex AI Assistant', "I can parse commands to perform live backend database modifications. Try asking:<br><br>&bull; <strong>'schedule from Reception to ICU'</strong> (runs A* route & logs SQL task)<br>&bull; <strong>'list active robots'</strong> (queries PyMongo collection)<br>&bull; <strong>'divert traffic'</strong> (explains corridor weights)<br><br>Or type any standard questions to chat!", false);
+            }
+        }
+
+        // Call the list robots API for chatbot interface
+        async function triggerListRobotsAPI() {
+            try {
+                const res = await fetch('/api/robots', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    const robots = await res.json();
+                    let responseHtml = '<strong>PyMongo Records found (' + robots.length + '):</strong><ul class="list-disc pl-5 mt-2 space-y-2">';
+                    robots.forEach(r => {
+                        responseHtml += `
+                        <li>
+                            <span class="font-bold text-white">${r.robot_id}</span> (${r.serial_number})<br>
+                            Status: <span class="text-indigo-400 font-semibold">${r.status}</span> | Location: ${r.location} | Battery: <span class="text-emerald-400">${r.battery}%</span> | Sanctioned: ${r.sanctioned}
+                        </li>
+                        `;
+                    });
+                    responseHtml += '</ul>';
+                    appendChatBubble('Rovex AI Assistant', responseHtml, false);
+                }
+            } catch (err) {
+                appendChatBubble('Rovex AI Assistant', "Error connecting to PyMongo robots database.", false);
+            }
+        }
+
+        // Dispatch scheduler request from Chat Commands
+        async function triggerTaskDispatchAPI(source_node, target_node) {
+            try {
+                const res = await fetch('/api/tasks', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ source_node, target_node, robot_id: null, scheduled_time: 'now', is_recurring: false, recurrence_interval: 'none' })
+                });
+
+                if (res.ok) {
+                    const task = await res.json();
+                    await fetchTasks();
+                    await fillFormSelectors();
+                    
+                    const path = JSON.parse(task.path);
+                    drawMap(path);
+                    await triggerPathfinderCalculation(source_node, target_node);
+                    
+                    appendChatBubble('Rovex AI Assistant', `<strong>SUCCESS: Stretcher Robot Dispatched!</strong><br><br>Task ID: <span class="font-mono-custom text-white font-bold">${task.id}</span><br>Route: ${path.join(' &rarr; ')}<br>Assigned Robot: ${task.robot_id || 'Waiting in Queue'}<br>ETA: ${task.eta_minutes} minutes.<br><br>Click <strong>'Simulate Transit Steps'</strong> on the sidebar task card to initiate execution!`, false);
+                } else {
+                    const err = await res.json();
+                    appendChatBubble('Rovex AI Assistant', `Failed to schedule: ${err.detail}`, false);
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        // Helper to append bubble
+        function appendChatBubble(sender, text, isUser) {
+            const history = document.getElementById('chatHistory');
+            
+            const outerDiv = document.createElement('div');
+            outerDiv.className = isUser ? "flex justify-end" : "flex justify-start";
+
+            const innerDiv = document.createElement('div');
+            innerDiv.className = isUser 
+                ? "max-w-[80%] bg-slate-900 border border-slate-800 p-4 rounded-2xl rounded-tr-none text-xs text-slate-300 select-text" 
+                : "max-w-[80%] bg-indigo-950/20 border border-indigo-900/30 p-4 rounded-2xl rounded-tl-none text-xs text-slate-300 select-text";
+
+            innerDiv.innerHTML = `
+                <span class="block text-[10px] uppercase tracking-wider font-bold ${isUser ? 'text-indigo-400' : 'text-purple-400'} mb-1">${sender}</span>
+                <p class="leading-relaxed whitespace-pre-wrap">${text}</p>
+            `;
+            outerDiv.appendChild(innerDiv);
+            history.appendChild(outerDiv);
+            
+            // Auto scroll to bottom
+            history.scrollTop = history.scrollHeight;
+        }
+    </script>
+</body>
+</html>
