@@ -25,6 +25,7 @@ from app.services.robot import service as robot_service
 from app.services.robot.schemas import RobotTelemetryPayload
 from app.services.robot.astar import plan_astar_path, hospital_map
 from app.services.notification import service as notification_service
+from app.main import serve_core_platform_page
 
 
 class TestRovexPlatform(unittest.TestCase):
@@ -280,6 +281,19 @@ class TestRovexPlatform(unittest.TestCase):
         self.assertIn("rovi-03", live_logs)
         self.assertIn("CRITICAL", live_logs)
         self.assertIn("collision safety trigger", live_logs.lower())
+
+    def test_core_platform_template_uses_desktop_shell_layout(self):
+        """
+        Verifies the core platform template keeps the desktop shell in a horizontal
+        layout so the sidebar stays on the left while the main content scrolls independently.
+        """
+        response = serve_core_platform_page(None)
+        html = response.body.decode("utf-8")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("md:flex-row", html)
+        self.assertIn("md:h-screen", html)
+        self.assertIn("min-w-0", html)
 
 
 if __name__ == "__main__":
