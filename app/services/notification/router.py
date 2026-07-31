@@ -28,11 +28,11 @@ class NotificationCreatePayload(BaseModel):
 @router.post("", response_model=Dict[str, Any], status_code=status.HTTP_201_CREATED)
 def trigger_notification(
     payload: NotificationCreatePayload,
-    current_user: Dict[str, Any] = Depends(RBACChecker(["supervisor", "sub-supervisor"])),
+    current_user: Dict[str, Any] = Depends(RBACChecker(["admin", "supervisor", "sub-supervisor"])),
     db: MockDatabase = Depends(get_nosql_db)
 ):
     """
-    Allows supervisors and sub-supervisors to trigger and broadcast a new manual notification.
+    Allows admins, supervisors, and sub-supervisors to trigger and broadcast a new manual notification.
     Automated telemetry systems can also post directly to this endpoint.
     """
     alert = notification_service.log_system_notification(
@@ -68,11 +68,11 @@ def list_notifications(
 @router.get("/logs", response_model=Dict[str, Any])
 def stream_system_logs(
     lines: int = Query(100, ge=10, le=500),
-    current_user: Dict[str, Any] = Depends(RBACChecker(["supervisor"]))
+    current_user: Dict[str, Any] = Depends(RBACChecker(["admin"]))
 ):
     """
     Reads and streams the physical 'data_pool_notifications.log' file on disk.
-    Restricted to Supervisors to ensure platform audit logs remain highly secure.
+    Restricted to Rovex Admins to ensure platform audit logs remain highly secure.
     """
     log_content = notification_service.get_live_log_stream(lines_count=lines)
     return {

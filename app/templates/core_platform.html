@@ -399,8 +399,8 @@
             document.getElementById('userRoleBadge').innerText = userObj.role.toUpperCase();
             document.getElementById('userInitials').innerText = userObj.full_name.split(' ').map(n => n[0]).join('');
 
-            // Hide/Show Admin Dashboard link based on role
-            if (userObj.role === 'supervisor') {
+            // Hide/Show Admin Dashboard link based on role — only Rovex admins see it
+            if (userObj.role === 'admin') {
                 document.getElementById('adminPortalBtn').classList.remove('hidden');
             }
 
@@ -452,8 +452,8 @@
             
             modal.classList.remove('hidden');
             
-            // Check RBAC
-            if (userObj.role !== 'supervisor' && userObj.role !== 'sub-supervisor') {
+            // Check RBAC — only supervisors, sub-supervisors, and admins can modify edge weights
+            if (userObj.role !== 'supervisor' && userObj.role !== 'sub-supervisor' && userObj.role !== 'admin') {
                 submitBtn.disabled = true;
                 submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
                 rbacWarning.classList.remove('hidden');

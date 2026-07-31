@@ -51,7 +51,7 @@ def create_user(db: Session, payload: UserCreate) -> UserSQL:
         raise ValueError(f"Username '{payload.username}' is already in use.")
         
     # Restrict roles to known types
-    allowed_roles = ["supervisor", "sub-supervisor", "employee"]
+    allowed_roles = ["admin", "supervisor", "sub-supervisor", "employee"]
     if payload.role not in allowed_roles:
         raise ValueError(f"Invalid role '{payload.role}'. Must be one of: {allowed_roles}")
 
@@ -76,7 +76,7 @@ def update_user_role(db: Session, username: str, new_role: str) -> UserSQL:
     Modifies the RBAC role of a user.
     Raises ValueError if the user is not found or the role is invalid.
     """
-    allowed_roles = ["supervisor", "sub-supervisor", "employee"]
+    allowed_roles = ["admin", "supervisor", "sub-supervisor", "employee"]
     if new_role not in allowed_roles:
         raise ValueError(f"Invalid role '{new_role}'. Must be one of: {allowed_roles}")
 

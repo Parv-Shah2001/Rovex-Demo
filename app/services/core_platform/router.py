@@ -2,9 +2,10 @@
 File: app/services/core_platform/router.py
 Description: FastAPI Router exposing Core Platform API endpoints for hospital staff.
 Enforces Role-Based Access Control (RBAC):
-  - supervisors can manage all robots, see staff members, and submit schedules.
-  - sub-supervisors can schedule tasks, view live statuses, and assign corridors.
-  - employees can view tasks and request assistance.
+  - admin (Rovex): can perform any action across all organizations (inherits all roles).
+  - supervisors: can manage all robots, see staff members, and submit schedules within their org.
+  - sub-supervisors: can schedule tasks, view live statuses, and assign corridors within their org.
+  - employees: can view tasks and request assistance.
 Integrates task storage (SQL OLTP), A* route planning, robot state updates (NoSQL),
 and alert streaming.
 """
@@ -18,7 +19,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db, get_nosql_db, MockDatabase, TaskSQL
-from app.core.auth import get_current_user_from_cookie_or_header, RBACChecker
+from app.core.auth import get_current_user_from_cookie_or_header, RBACChecker, is_admin
 from app.services.robot import service as robot_service
 from app.services.robot.astar import plan_astar_path, hospital_map
 from app.services.notification import service as notification_service
@@ -39,6 +40,7 @@ def schedule_transit_task(
     Schedules a new stretcher transport assignment from source to destination.
     Utilizes A* navigation to plan optimal routes and compute initial ETAs.
     Saves the task in the relational OLTP database and triggers dispatcher alerts.
+    Admins can also schedule tasks via the RBAC hierarchy.
     """
     # 1. Validate hospital layout nodes
     nodes = hospital_map.get_nodes()
@@ -69,7 +71,8 @@ def schedule_transit_task(
         robot = robot_service.get_robot_by_id(db_nosql, target_robot_id)
         if not robot:
              raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Robot '{target_robot_id}' does not exist.")
-        if robot["organization"] != current_user["organization"]:
+        # Hospital staff cannot assign robots from other organizations; admins can assign any
+        if not is_admin(current_user) and robot["organization"] != current_user["organization"]:
              raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This robot belongs to another institution.")
         if not robot["sanctioned"]:
              raise HTTPException(
@@ -82,9 +85,10 @@ def schedule_transit_task(
                  detail=f"Robot '{target_robot_id}' is in error state and requires servicing."
              )
     else:
-        # Automatic robot assignment
-        # Search for an idle, sanctioned robot with the highest battery in the organization
-        available_robots = robot_service.get_robots_by_organization(db_nosql, current_user["organization"])
+        # Automatic robot assignment — search within the user's organization
+        # (admins see all robots but auto-assign from the first matching org with available bots)
+        search_org = current_user["organization"]
+        available_robots = robot_service.get_robots_by_organization(db_nosql, search_org)
         eligible = [
             r for r in available_robots 
             if r["sanctioned"] and r["status"] == "idle" and r["battery"] > 20.0
@@ -159,11 +163,13 @@ def list_tasks(
     db_sql: Session = Depends(get_db)
 ):
     """
-    Lists all scheduled, ongoing, and completed tasks within the user's organization.
-    Supports supervisor, sub-supervisor, and employee views.
+    Lists scheduled, ongoing, and completed tasks visible to the current user.
+    - Rovex admins see ALL tasks across every organization.
+    - Hospital staff see only tasks within their own organization.
     """
-    tasks = db_sql.query(TaskSQL).filter(TaskSQL.organization == current_user["organization"]).all()
-    return tasks
+    if is_admin(current_user):
+        return db_sql.query(TaskSQL).all()
+    return db_sql.query(TaskSQL).filter(TaskSQL.organization == current_user["organization"]).all()
 
 
 @router.post("/{task_id}/execute", response_model=TaskResponse)
@@ -177,17 +183,19 @@ def execute_and_simulate_transit(
     Triggers execution for pending tasks or simulates step-by-step traversal 
     for ongoing tasks. Automatically generates transit alerts (departure, intermediate nodes, 
     and goal completion) and modifies live coordinates in the NoSQL database.
+    Admins can also execute tasks via the RBAC hierarchy.
     """
     task = db_sql.query(TaskSQL).filter(TaskSQL.id == task_id).first()
     if not task:
          raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found.")
          
-    if task.organization != current_user["organization"]:
+    # Hospital staff can only execute tasks within their own organization
+    if not is_admin(current_user) and task.organization != current_user["organization"]:
          raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access Denied.")
          
     # If pending, try to assign an idle robot
     if task.status == "pending" and not task.robot_id:
-        available_robots = robot_service.get_robots_by_organization(db_nosql, current_user["organization"])
+        available_robots = robot_service.get_robots_by_organization(db_nosql, task.organization)
         eligible = [r for r in available_robots if r["sanctioned"] and r["status"] == "idle"]
         if not eligible:
             raise HTTPException(
@@ -306,12 +314,14 @@ def cancel_transit_task(
 ):
     """
     Cancels an active or scheduled transit task. Clears assignments and reverts robot states.
+    Admins can also cancel tasks via the RBAC hierarchy.
     """
     task = db_sql.query(TaskSQL).filter(TaskSQL.id == task_id).first()
     if not task:
          raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found.")
          
-    if task.organization != current_user["organization"]:
+    # Hospital staff can only cancel tasks within their own organization
+    if not is_admin(current_user) and task.organization != current_user["organization"]:
          raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access Denied.")
          
     if task.status in ["completed", "cancelled"]:
@@ -355,12 +365,14 @@ def submit_robot_service_request(
     """
     Enables staff members (including Employees) to file a maintenance service request
     for a faulty robot device. Automatically flags a critical event alert.
+    - Rovex admins can file requests for any robot regardless of organization.
+    - Hospital staff can only file requests for robots in their own organization.
     """
     robot = robot_service.get_robot_by_id(db_nosql, payload.robot_id)
     if not robot:
          raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Robot not found.")
          
-    if robot["organization"] != current_user["organization"]:
+    if not is_admin(current_user) and robot["organization"] != current_user["organization"]:
          raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access Denied.")
          
     # Update last problem on robot profile

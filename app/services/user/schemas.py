@@ -22,7 +22,7 @@ class UserCreate(BaseModel):
     """
     username: str = Field(..., min_length=3, max_length=50, description="Unique username for the login credentials")
     password: str = Field(..., min_length=6, description="User password (will be stored securely)")
-    role: str = Field(..., description="RBAC Role: 'supervisor', 'sub-supervisor', or 'employee'")
+    role: str = Field(..., description="RBAC Role: 'admin', 'supervisor', 'sub-supervisor', or 'employee'")
     organization: str = Field(..., description="The hospital/institution organization name (e.g., 'St. Jude Hospital')")
     full_name: str = Field(..., description="Full name of the staff member")
     email: EmailStr = Field(..., description="Valid work email address")
@@ -49,4 +49,4 @@ class RoleUpdatePayload(BaseModel):
     """
     Schema representing user RBAC role policy updates.
     """
-    role: str = Field(..., description="The new RBAC target role: 'supervisor', 'sub-supervisor', or 'employee'")
+    role: str = Field(..., description="The new RBAC target role: 'admin', 'supervisor', 'sub-supervisor', or 'employee'")

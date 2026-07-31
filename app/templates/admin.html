@@ -269,8 +269,8 @@
         // Initializer
         window.addEventListener('DOMContentLoaded', async () => {
             // Guard check: is user authenticated and Supervisor?
-            if (!token || !userObj || userObj.role !== 'supervisor') {
-                alert("Access Denied: Only users with 'supervisor' role can access the Admin Platform dashboard.");
+            if (!token || !userObj || userObj.role !== 'admin') {
+                alert("Access Denied: Only Rovex Admins can access the Admin Platform dashboard.");
                 window.location.href = '/';
                 return;
             }
@@ -357,6 +357,7 @@
                             <td class="p-3 text-slate-400">${u.organization}</td>
                             <td class="p-3">
                                 <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                    u.role === 'admin' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/25' :
                                     u.role === 'supervisor' ? 'bg-red-500/10 text-red-400 border border-red-500/25' :
                                     u.role === 'sub-supervisor' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/25' :
                                     'bg-slate-500/10 text-slate-400 border border-slate-500/25'

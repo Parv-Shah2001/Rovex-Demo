@@ -3,13 +3,18 @@ File: app/services/robot/router.py
 Description: FastAPI Router exposing Robot Management and Route Optimization API endpoints.
 Provides routes for telemetry ingestion, robot profile lookups, sanction controls,
 A* path planning calculations, and real-time graph edge weight adjustments.
+
+Organization scoping:
+  - Admin (Rovex) users can see ALL robots across every organization.
+  - Hospital staff (supervisor, sub-supervisor, employee) can only see robots
+    belonging to their own organization.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List, Dict, Any, Optional
 
 from app.core.database import MockDatabase, get_nosql_db
-from app.core.auth import get_current_user_from_cookie_or_header, RBACChecker
+from app.core.auth import get_current_user_from_cookie_or_header, RBACChecker, is_admin
 from app.services.robot.schemas import (
     RobotTelemetryPayload, 
     RobotResponse, 
@@ -46,11 +51,13 @@ def list_robots(
     db: MockDatabase = Depends(get_nosql_db)
 ):
     """
-    Lists all robot devices registered under the current user's institution/organization.
-    Access is open to all authenticated staff members (Supervisor, Sub-supervisor, Employee).
+    Lists robot devices visible to the current user.
+    - Rovex admins see ALL robots across every organization.
+    - Hospital staff see only robots belonging to their own organization.
     """
-    robots = robot_service.get_robots_by_organization(db, current_user["organization"])
-    return robots
+    if is_admin(current_user):
+        return robot_service.get_all_robots(db)
+    return robot_service.get_robots_by_organization(db, current_user["organization"])
 
 
 @router.get("/graph/layout", response_model=Dict[str, Any])
@@ -73,6 +80,7 @@ def adjust_corridor_weight(
     """
     Dynamically adjusts the weight of a graph edge (e.g. increase weight for crowded corridors).
     Allows supervisors and sub-supervisors to optimize robot fleet routing.
+    Admins can also access this via the RBAC hierarchy.
     """
     success = astar.hospital_map.update_edge_weight(payload.node_a, payload.node_b, payload.weight)
     if not success:
@@ -112,7 +120,8 @@ def get_robot_profile(
 ):
     """
     Returns the full detailed biodata profile of a single robot.
-    Ensures that the robot belongs to the user's registered organization.
+    - Rovex admins can view any robot regardless of organization.
+    - Hospital staff can only view robots belonging to their own organization.
     """
     robot = robot_service.get_robot_by_id(db, robot_id)
     if not robot:
@@ -121,8 +130,8 @@ def get_robot_profile(
             detail=f"Robot with ID '{robot_id}' was not found."
         )
         
-    # Security: check organizational boundary
-    if robot["organization"] != current_user["organization"]:
+    # Security: hospital staff cannot view robots from other organizations
+    if not is_admin(current_user) and robot["organization"] != current_user["organization"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access Denied. This robot belongs to another institution."
@@ -134,12 +143,13 @@ def get_robot_profile(
 def modify_robot_sanction_status(
     robot_id: str,
     payload: UpdateSanctionRequest,
-    current_user: Dict[str, Any] = Depends(RBACChecker(["supervisor"])),
+    current_user: Dict[str, Any] = Depends(RBACChecker(["admin"])),
     db: MockDatabase = Depends(get_nosql_db)
 ):
     """
-    Allows a Supervisor to sanction or un-sanction a robot.
+    Allows a Rovex Admin to sanction or un-sanction a robot.
     Un-sanctioned robots cannot accept transport tasks.
+    This is a platform-level action restricted to Rovex staff only.
     """
     robot = robot_service.get_robot_by_id(db, robot_id)
     if not robot:
@@ -161,13 +171,14 @@ def get_robot_telemetry_history(
 ):
     """
     Retrieves the historical telemetry stream logs for a single robot.
-    Used for analytics and log auditing.
+    - Rovex admins can view any robot's telemetry regardless of organization.
+    - Hospital staff can only view telemetry for robots in their own organization.
     """
     robot = robot_service.get_robot_by_id(db, robot_id)
     if not robot:
          raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Robot not found")
          
-    if robot["organization"] != current_user["organization"]:
+    if not is_admin(current_user) and robot["organization"] != current_user["organization"]:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access Denied.")
         
     logs = robot_service.get_recent_telemetry(db, robot_id, limit)
