@@ -6,12 +6,13 @@ dynamically adjusted to avoid high-congestion corridors, and the solver returns 
 traversal details so the frontend can visualize exactly how the algorithm works.
 """
 
-import math
+import copy
 import heapq
 import logging
-from typing import List, Dict, Any, Tuple, Optional, Set
+import math
+from typing import Any, Dict, List, Optional, Tuple
 
-from app.core.config import DEFAULT_NODES, DEFAULT_EDGES
+from app.core.config import DEFAULT_EDGES, DEFAULT_NODES
 
 logger = logging.getLogger("rovex.astar")
 
@@ -20,17 +21,24 @@ class HospitalGraph:
     """
     Manages the physical hospital layout graph, consisting of nodes with 2D coordinates 
     (in meters) and bidirectional edges with numeric transit weights.
+
+    The constructor accepts optional node/edge datasets so the graph logic can be
+    tested and evolved independently of the default hospital layout singleton.
     """
-    def __init__(self):
+    def __init__(
+        self,
+        nodes: Optional[Dict[str, Dict[str, Any]]] = None,
+        edges: Optional[List[Dict[str, Any]]] = None,
+    ):
+        source_nodes = nodes or DEFAULT_NODES
+        source_edges = edges or DEFAULT_EDGES
+
         # Nodes: { "NodeName": { "x": float, "y": float, "description": str } }
-        self.nodes: Dict[str, Dict[str, Any]] = dict(DEFAULT_NODES)
-        
+        self.nodes: Dict[str, Dict[str, Any]] = copy.deepcopy(source_nodes)
+
         # Edges: { "NodeA": { "NodeB": weight } }
-        self.edges: Dict[str, Dict[str, float]] = {}
-        for node in self.nodes:
-            self.edges[node] = {}
-            
-        for edge in DEFAULT_EDGES:
+        self.edges: Dict[str, Dict[str, float]] = {node: {} for node in self.nodes}
+        for edge in source_edges:
             n1, n2, w = edge["from"], edge["to"], edge["weight"]
             if n1 in self.nodes and n2 in self.nodes:
                 self.edges[n1][n2] = w
@@ -124,6 +132,9 @@ def plan_astar_path(start: str, goal: str, graph: HospitalGraph = hospital_map) 
     while open_set:
         # Get the node with lowest f_score
         current_f, current = heapq.heappop(open_set)
+        if current_f > f_score[current]:
+            continue
+
         visited_nodes.append(current)
         
         # Log current step details
@@ -166,9 +177,7 @@ def plan_astar_path(start: str, goal: str, graph: HospitalGraph = hospital_map) 
                 g_score[neighbor] = tentative_g_score
                 f_score[neighbor] = tentative_g_score + graph.get_distance(neighbor, goal)
                 
-                # Check if already in queue (simplified heapq logic)
-                if not any(item[1] == neighbor for item in open_set):
-                    heapq.heappush(open_set, (f_score[neighbor], neighbor))
+                heapq.heappush(open_set, (f_score[neighbor], neighbor))
                     
     logger.warning(f"A* search completed with no path from [{start}] to [{goal}].")
     return None

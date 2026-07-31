@@ -20,19 +20,53 @@ from app.core.database import MockDatabase
 logger = logging.getLogger("rovex.admin_service")
 
 
+def _normalize_sql_query(sql_query: str) -> str:
+    """
+    Normalizes a raw SQL sandbox query while enforcing single-statement,
+    read-only execution rules.
+
+    The helper prevents command chaining and keeps write-capable statements out
+    of the admin domain, which makes a future move to a dedicated analytics /
+    inspection service safer.
+    """
+    sql_stripped = sql_query.strip()
+    if not sql_stripped:
+        raise ValueError("SQL query cannot be empty.")
+
+    statement = sql_stripped[:-1].strip() if sql_stripped.endswith(";") else sql_stripped
+    if ";" in statement:
+        raise ValueError("Sandbox security policy violation: multiple SQL statements are not allowed.")
+
+    lowered = statement.lower()
+    if not (lowered.startswith("select") or lowered.startswith("with")):
+        raise ValueError("Sandbox security policy violation: Only read-only SELECT/CTE queries are allowed in this SQL workspace.")
+
+    return statement
+
+
+def _parse_nosql_filter(filter_args_str: str) -> Dict[str, Any]:
+    """
+    Parses a PyMongo-style filter string into a Python dictionary.
+    """
+    if not filter_args_str:
+        return {}
+
+    try:
+        cleaned_args = filter_args_str.replace("'", '"')
+        return json.loads(cleaned_args)
+    except Exception as e:
+        raise ValueError(f"JSON Filter syntax error: could not parse '{filter_args_str}'. Error: {e}")
+
+
 def execute_sandbox_sql(db: Session, sql_query: str) -> List[Dict[str, Any]]:
     """
     Executes raw SQL statements against the OLTP SQL database.
     Only allows read-only (SELECT) statements in the sandbox to enforce security.
     """
-    sql_stripped = sql_query.strip()
-    
-    # Simple read-only validation
-    if not sql_stripped.lower().startswith("select"):
-        raise ValueError("Sandbox security policy violation: Only 'SELECT' queries are allowed in this SQL workspace.")
-        
+    normalized_query = _normalize_sql_query(sql_query)
+
     try:
-        result = db.execute(text(sql_stripped))
+        result = db.execute(text(normalized_query))
         # Parse mappings to key-value dicts
         columns = result.keys()
         rows = [dict(zip(columns, row)) for row in result.fetchall()]
@@ -68,22 +102,14 @@ def execute_sandbox_nosql(db: MockDatabase, query_str: str) -> List[Dict[str, An
     method_name = match.group(2)
     filter_args_str = match.group(3).strip()
     
-    # Parse filter string to python dictionary
-    filter_dict = {}
-    if filter_args_str:
-        try:
-            # Replace single quotes with double quotes for valid JSON parsing if needed
-            cleaned_args = filter_args_str.replace("'", '"')
-            filter_dict = json.loads(cleaned_args)
-        except Exception as e:
-            raise ValueError(f"JSON Filter syntax error: could not parse '{filter_args_str}'. Error: {e}")
-            
+    filter_dict = _parse_nosql_filter(filter_args_str)
+
     # Execute on mock PyMongo
     try:
         collection = db[collection_name]
         if method_name == "find":
             cursor = collection.find(filter_dict)
-            return cursor._data
+            return [document for document in cursor]
         elif method_name == "find_one":
             res = collection.find_one(filter_dict)
             return [res] if res else []
@@ -92,6 +118,38 @@ def execute_sandbox_nosql(db: MockDatabase, query_str: str) -> List[Dict[str, An
     except Exception as e:
         logger.error(f"NoSQL Sandbox Exception: {e}")
         raise ValueError(f"NoSQL execution error: {e}")
+
+
+def run_sandbox_query(
+    db_sql: Session,
+    db_nosql: MockDatabase,
+    db_type: str,
+    query_str: str,
+) -> Dict[str, Any]:
+    """
+    Executes a sandbox query and returns a normalized response payload.
+
+    Centralizing the branching keeps the router transport-focused and leaves the
+    admin service responsible for domain-specific query semantics.
+    """
+    db_type_lower = db_type.lower().strip()
+    if db_type_lower == "sql":
+        results = execute_sandbox_sql(db_sql, query_str)
+        return {
+            "status": "success",
+            "db_type": "SQL (Postgres Simulated)",
+            "record_count": len(results),
+            "data": results,
+        }
+    if db_type_lower == "nosql":
+        results = execute_sandbox_nosql(db_nosql, query_str)
+        return {
+            "status": "success",
+            "db_type": "NoSQL (MongoDB Mocked)",
+            "record_count": len(results),
+            "data": results,
+        }
+    raise ValueError("Invalid database type. Must be either 'sql' or 'nosql'.")
 
 
 def get_admin_dashboard_stats(db_sql: Session, db_nosql: MockDatabase) -> Dict[str, Any]:

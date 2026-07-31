@@ -24,8 +24,9 @@ from app.services.user import service as user_service
 from app.services.user.schemas import UserCreate
 from app.services.robot import service as robot_service
 from app.services.robot.schemas import RobotTelemetryPayload
-from app.services.robot.astar import plan_astar_path, hospital_map
+from app.services.robot.astar import HospitalGraph, plan_astar_path, hospital_map
 from app.services.notification import service as notification_service
+from app.services.admin import service as admin_service
 from app.services.core_platform.router import schedule_transit_task
 from app.services.core_platform.schemas import TaskCreatePayload
 from app.main import (
@@ -227,6 +228,48 @@ class TestRovexPlatform(unittest.TestCase):
         self.assertEqual(updated_robot["assigned_task_id"], "test-mission-104")
         self.assertEqual(updated_robot["status"], "transit")
 
+    def test_nosql_robot_emergency_telemetry_preserves_error_status(self):
+        """
+        Verifies emergency-stop telemetry does not get overwritten back to a
+        transit state simply because the payload still contains a mission ID.
+        """
+        telemetry_data = {
+            "robot_id": "rovi-02",
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "mission_id": "task-emergency-1",
+            "motion": {
+                "speed_mps": 0.0,
+                "steering_angle_rad": 0.0,
+                "distance_traveled_m": 12.0
+            },
+            "battery": {
+                "percentage": 81.0,
+                "remaining_capacity_mah": 24000
+            },
+            "localization": {
+                "x_m": 5.0,
+                "y_m": 5.0,
+                "heading_rad": 0.0
+            },
+            "safety": {
+                "perception_enabled": True,
+                "speed_reduced": True,
+                "obstacle_stop": True,
+                "emergency_stop": True
+            },
+            "system_health": {
+                "cameras_online": 3,
+                "lidar_online": True,
+                "controller_connected": True
+            }
+        }
+
+        robot_service.ingest_robot_telemetry(nosql_db, RobotTelemetryPayload(**telemetry_data))
+        updated_robot = robot_service.get_robot_by_id(nosql_db, "rovi-02")
+
+        self.assertEqual(updated_robot["status"], "error")
+        self.assertEqual(updated_robot["assigned_task_id"], "task-emergency-1")
+
 
     # =====================================================================
     # 5. A* PATHFINDING & ROUTING TESTS
@@ -258,6 +301,31 @@ class TestRovexPlatform(unittest.TestCase):
         
         # Restore weight
         hospital_map.update_edge_weight("Reception", "Nursing Station", 5.0)
+
+    def test_astar_reopens_nodes_when_better_path_is_found(self):
+        """
+        Validates the planner can reconsider a node when a cheaper route is
+        discovered later, which is required for optimal A* behavior.
+        """
+        custom_graph = HospitalGraph(
+            nodes={
+                "Start": {"x": 0.0, "y": 0.0, "description": "Start"},
+                "Near": {"x": 5.0, "y": 0.0, "description": "Near but expensive branch"},
+                "Mid": {"x": 0.0, "y": 1.0, "description": "Intermediate hop"},
+                "Goal": {"x": 6.0, "y": 0.0, "description": "Goal"},
+            },
+            edges=[
+                {"from": "Start", "to": "Near", "weight": 10.0},
+                {"from": "Start", "to": "Mid", "weight": 1.0},
+                {"from": "Mid", "to": "Near", "weight": 1.0},
+                {"from": "Near", "to": "Goal", "weight": 1.0},
+            ],
+        )
+
+        result = plan_astar_path("Start", "Goal", custom_graph)
+        self.assertIsNotNone(result)
+        self.assertEqual(result["path"], ["Start", "Mid", "Near", "Goal"])
+        self.assertEqual(result["total_cost"], 3.0)
 
 
     # =====================================================================
@@ -346,6 +414,20 @@ class TestRovexPlatform(unittest.TestCase):
         self.assertIn("sidebar-collapsed", html)
         self.assertIn("toggleSidebar()", html)
         self.assertIn("@media (min-width: 768px)", html)
+
+    def test_admin_sandbox_rejects_mutating_sql_and_allows_read_only_ctes(self):
+        """
+        Verifies the admin SQL sandbox blocks mutating statements and still allows
+        read-only common-table-expression queries used by analysts.
+        """
+        with self.assertRaises(ValueError):
+            admin_service.execute_sandbox_sql(self.db_sql, "SELECT * FROM users; DELETE FROM users")
+
+        cte_result = admin_service.execute_sandbox_sql(
+            self.db_sql,
+            "WITH scoped_users AS (SELECT username FROM users WHERE role = 'supervisor') SELECT * FROM scoped_users"
+        )
+        self.assertTrue(any(row["username"] == "sup_sarah" for row in cte_result))
 
     def test_html_dashboard_routes_disable_browser_caching(self):
         """

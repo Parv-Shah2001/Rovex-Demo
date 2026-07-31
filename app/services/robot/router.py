@@ -121,7 +121,7 @@ def calculate_optimal_path(
     Runs the A* pathfinding algorithm on the active hospital map.
     Returns the optimal list of nodes, total cost, total distance, and step logs.
     """
-    result = astar.plan_astar_path(payload.start_node, payload.goal_node)
+    result = robot_service.calculate_path_plan(payload.start_node, payload.goal_node)
     if not result:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

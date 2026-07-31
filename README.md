@@ -76,6 +76,7 @@ The face-to-face employee workspace is styled with a sleek **Gemini-like AI Chat
 - The frontend parses commands programmatically to trigger underlying REST APIs.
 - A live **2D HTML5 Canvas** renders the hospital layout, highlighting optimal paths and showing robot movements coordinate-by-coordinate in real-time.
 - On desktop screens, the Core Platform behaves like a sticky app shell: a collapsible left operations rail stays pinned while the chat/map workspace scrolls independently.
+- On desktop screens, the Core Platform behaves like a sticky app shell: a collapsible left operations rail stays pinned while the chat/map workspace scrolls independently.
 
 ---
 

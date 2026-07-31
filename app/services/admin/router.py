@@ -61,29 +61,6 @@ def run_database_sandbox_query(
          raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Query string cannot be empty.")
          
     try:
-        if db_type_lower == "sql":
-            results = admin_service.execute_sandbox_sql(db_sql, query_str)
-            return {
-                "status": "success",
-                "db_type": "SQL (Postgres Simulated)",
-                "record_count": len(results),
-                "data": results
-            }
-        elif db_type_lower == "nosql":
-            results = admin_service.execute_sandbox_nosql(db_nosql, query_str)
-            return {
-                "status": "success",
-                "db_type": "NoSQL (MongoDB Mocked)",
-                "record_count": len(results),
-                "data": results
-            }
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid database type. Must be either 'sql' or 'nosql'."
-            )
+        return admin_service.run_sandbox_query(db_sql, db_nosql, db_type_lower, query_str)
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))

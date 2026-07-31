@@ -10,9 +10,37 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime
 
 from app.core.database import MockDatabase
+from app.services.robot.astar import hospital_map, plan_astar_path
 from app.services.robot.schemas import RobotTelemetryPayload
 
 logger = logging.getLogger("rovex.robot_service")
+
+
+def get_graph_layout() -> Dict[str, Any]:
+    """
+    Returns the active hospital routing layout in a frontend-friendly shape.
+
+    Keeping graph serialization in the service layer prevents routers from
+    depending directly on the pathfinding singleton implementation.
+    """
+    return {
+        "nodes": hospital_map.get_nodes(),
+        "edges": hospital_map.get_edges(),
+    }
+
+
+def adjust_corridor_weight(node_a: str, node_b: str, weight: float) -> bool:
+    """
+    Updates the active routing graph weight for a corridor edge.
+    """
+    return hospital_map.update_edge_weight(node_a, node_b, weight)
+
+
+def calculate_path_plan(start_node: str, goal_node: str) -> Optional[Dict[str, Any]]:
+    """
+    Runs the active A* planner and returns the resulting route payload.
+    """
+    return plan_astar_path(start_node, goal_node, hospital_map)
 
 
 def get_all_robots(db: MockDatabase) -> List[Dict[str, Any]]:
@@ -70,12 +98,12 @@ def ingest_robot_telemetry(db: MockDatabase, telemetry: RobotTelemetryPayload) -
             "battery": round(telemetry.battery.percentage, 1),
             "x_m": round(telemetry.localization.x_m, 2),
             "y_m": round(telemetry.localization.y_m, 2),
-            "status": status
+            "status": status,
+            "assigned_task_id": telemetry.mission_id,
         }
         
-        # If running a mission, keep sync
-        if telemetry.mission_id:
-            update_data["assigned_task_id"] = telemetry.mission_id
+        # If running a mission and the robot is still healthy, keep sync
+        if telemetry.mission_id and status != "error":
             update_data["status"] = "transit"
             
         db["robots"].update_one(
@@ -94,7 +122,7 @@ def ingest_robot_telemetry(db: MockDatabase, telemetry: RobotTelemetryPayload) -
             "last_problem": "Ad-hoc initialization",
             "sanctioned": True,
             "battery": telemetry.battery.percentage,
-            "status": "idle",
+            "status": "error" if telemetry.safety.emergency_stop or telemetry.battery.percentage < 15.0 else "idle",
             "assigned_task_id": telemetry.mission_id,
             "location": "Reception",
             "x_m": telemetry.localization.x_m,
