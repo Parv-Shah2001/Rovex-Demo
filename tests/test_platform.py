@@ -26,11 +26,8 @@ from app.services.robot import service as robot_service
 from app.services.robot.schemas import RobotTelemetryPayload
 from app.services.robot.astar import plan_astar_path, hospital_map
 from app.services.notification import service as notification_service
-<<<<<<< HEAD
-=======
 from app.services.core_platform.router import schedule_transit_task
 from app.services.core_platform.schemas import TaskCreatePayload
->>>>>>> 8c20d0d (Harden modular architecture and core platform flows)
 from app.main import (
     serve_core_platform_page,
     serve_index_page,

@@ -485,10 +485,53 @@
         const token = localStorage.getItem('rovex_token');
         const userObj = JSON.parse(localStorage.getItem('rovex_user') || '{}');
         const SIDEBAR_COLLAPSE_KEY = 'rovex_core_sidebar_collapsed';
+        const CORRIDOR_WEIGHT_EDITOR_ROLES = new Set(['admin', 'supervisor', 'sub-supervisor']);
         
         let nodesLayout = {};
         let edgesLayout = [];
         let canvas, ctx;
+
+        function buildAuthHeaders(includeJsonContentType = false) {
+            const headers = {};
+            if (includeJsonContentType) {
+                headers['Content-Type'] = 'application/json';
+            }
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+            return headers;
+        }
+
+        async function apiRequest(url, { method = 'GET', body = null, headers = {} } = {}) {
+            const response = await fetch(url, {
+                method,
+                headers: {
+                    ...buildAuthHeaders(Boolean(body)),
+                    ...headers,
+                },
+                body: body ? JSON.stringify(body) : undefined,
+            });
+
+            const contentType = response.headers.get('content-type') || '';
+            const payload = contentType.includes('application/json')
+                ? await response.json()
+                : await response.text();
+
+            if (!response.ok) {
+                const detail = payload?.detail || payload?.message || (typeof payload === 'string' ? payload : 'Request failed.');
+                throw new Error(detail);
+            }
+
+            return payload;
+        }
+
+        function setModalVisibility(modalId, isVisible) {
+            document.getElementById(modalId).classList.toggle('hidden', !isVisible);
+        }
+
+        function canModifyEdgeWeights() {
+            return CORRIDOR_WEIGHT_EDITOR_ROLES.has(userObj.role);
+        }
 
         function syncSidebarToggleIcon() {
             const toggleIcon = document.getElementById('sidebarToggleIcon');
@@ -594,33 +637,29 @@
 
         // Modals management
         function openScheduleModal() {
-            document.getElementById('scheduleModal').classList.remove('hidden');
+            setModalVisibility('scheduleModal', true);
         }
         function closeScheduleModal() {
-            document.getElementById('scheduleModal').classList.add('hidden');
+            setModalVisibility('scheduleModal', false);
         }
         function openServiceModal() {
-            document.getElementById('serviceModal').classList.remove('hidden');
+            setModalVisibility('serviceModal', true);
         }
         function closeServiceModal() {
-            document.getElementById('serviceModal').classList.add('hidden');
+            setModalVisibility('serviceModal', false);
         }
         function openWeightModal() {
-            const modal = document.getElementById('weightModal');
             const submitBtn = document.getElementById('weightSubmitBtn');
             const rbacWarning = document.getElementById('weightRbacWarning');
-            
-            modal.classList.remove('hidden');
-            
-            // Check RBAC — only supervisors, sub-supervisors, and admins can modify edge weights
-            if (userObj.role !== 'supervisor' && userObj.role !== 'sub-supervisor' && userObj.role !== 'admin') {
-                submitBtn.disabled = true;
-                submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
-                rbacWarning.classList.remove('hidden');
-            }
+
+            setModalVisibility('weightModal', true);
+            submitBtn.disabled = !canModifyEdgeWeights();
+            submitBtn.classList.toggle('opacity-50', !canModifyEdgeWeights());
+            submitBtn.classList.toggle('cursor-not-allowed', !canModifyEdgeWeights());
+            rbacWarning.classList.toggle('hidden', canModifyEdgeWeights());
         }
         function closeWeightModal() {
-            document.getElementById('weightModal').classList.add('hidden');
+            setModalVisibility('weightModal', false);
         }
 
         // Clear Conversation Log
@@ -658,22 +697,17 @@
 
             // Load robot list options
             try {
-                const res = await fetch('/api/robots', {
-                    headers: { 'Authorization': `Bearer ${token}` }
+                const robots = await apiRequest('/api/robots');
+                const rSelect = document.getElementById('assignRobot');
+                const sSelect = document.getElementById('serviceRobot');
+                rSelect.innerHTML = '<option value="">Auto-assign (Idle with highest battery)</option>';
+                sSelect.innerHTML = '';
+                robots.forEach(r => {
+                    if (r.sanctioned && r.status === 'idle') {
+                        rSelect.add(new Option(`${r.robot_id} (${r.battery}%)`, r.robot_id));
+                    }
+                    sSelect.add(new Option(r.robot_id, r.robot_id));
                 });
-                if (res.ok) {
-                    const robots = await res.json();
-                    const rSelect = document.getElementById('assignRobot');
-                    const sSelect = document.getElementById('serviceRobot');
-                    rSelect.innerHTML = '<option value="">Auto-assign (Idle with highest battery)</option>';
-                    sSelect.innerHTML = '';
-                    robots.forEach(r => {
-                        if (r.sanctioned && r.status === 'idle') {
-                            rSelect.add(new Option(`${r.robot_id} (${r.battery}%)`, r.robot_id));
-                        }
-                        sSelect.add(new Option(r.robot_id, r.robot_id));
-                    });
-                }
             } catch (err) {
                 console.error(err);
             }
@@ -682,15 +716,10 @@
         // Fetch hospital floor map coordinates
         async function fetchMapLayout() {
             try {
-                const res = await fetch('/api/robots/graph/layout', {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (res.ok) {
-                    const data = await res.json();
-                    nodesLayout = data.nodes;
-                    edgesLayout = data.edges;
-                    drawMap();
-                }
+                const data = await apiRequest('/api/robots/graph/layout');
+                nodesLayout = data.nodes;
+                edgesLayout = data.edges;
+                drawMap();
             } catch (err) {
                 console.error(err);
             }
@@ -775,56 +804,50 @@
         // Fetch user organization scheduled tasks
         async function fetchTasks() {
             try {
-                const res = await fetch('/api/tasks', {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (res.ok) {
-                    const tasks = await res.json();
-                    
-                    // Filter for active (ongoing or pending) tasks
-                    const activeTasks = tasks.filter(t => t.status === 'ongoing' || t.status === 'pending');
-                    const taskListEl = document.getElementById('ongoingMissionsList');
-                    
-                    if (activeTasks.length === 0) {
-                        taskListEl.innerHTML = '<div class="text-center py-4 text-xs text-slate-600">No active tasks.</div>';
-                        return;
-                    }
-                    
-                    let html = '';
-                    activeTasks.forEach(t => {
-                        html += `
-                        <div class="bg-slate-900 border border-slate-800 p-3.5 rounded-xl space-y-2 relative group overflow-hidden">
-                            <div class="flex justify-between items-start">
-                                <div>
-                                    <span class="text-[10px] font-mono-custom text-slate-500 font-bold uppercase block">${t.id}</span>
-                                    <span class="text-xs font-bold text-white">${t.source_node} &rarr; ${t.target_node}</span>
-                                </div>
-                                <span class="text-[9px] font-bold px-2 py-0.5 rounded ${
-                                    t.status === 'ongoing' ? 'bg-indigo-950 text-indigo-400 border border-indigo-900/30 animate-pulse' : 'bg-slate-800 text-slate-400'
-                                }">
-                                    ${t.status.toUpperCase()}
-                                </span>
-                            </div>
+                const tasks = await apiRequest('/api/tasks');
 
-                            <div class="flex items-center justify-between text-[10px] text-slate-400 pt-1">
-                                <span>Robot: <span class="font-bold text-slate-300 font-mono-custom">${t.robot_id || 'Auto-assigning'}</span></span>
-                                <span>ETA: <span class="font-bold text-emerald-400 font-mono-custom">${t.eta_minutes} min</span></span>
-                            </div>
+                // Filter for active (ongoing or pending) tasks
+                const activeTasks = tasks.filter(t => t.status === 'ongoing' || t.status === 'pending');
+                const taskListEl = document.getElementById('ongoingMissionsList');
 
-                            <!-- Controls for transit simulation -->
-                            <div class="flex space-x-2 pt-1.5 border-t border-slate-950">
-                                <button onclick="triggerTransitSimulation('${t.id}')" class="flex-grow text-center py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold transition">
-                                    <i class="fa-solid fa-play mr-1"></i> Simulate Transit Steps
-                                </button>
-                                <button onclick="cancelTask('${t.id}')" class="px-2 py-1.5 rounded bg-slate-950 hover:bg-rose-950/20 text-slate-500 hover:text-rose-400 border border-slate-800 transition">
-                                    <i class="fa-solid fa-ban"></i>
-                                </button>
-                            </div>
-                        </div>
-                        `;
-                    });
-                    taskListEl.innerHTML = html;
+                if (activeTasks.length === 0) {
+                    taskListEl.innerHTML = '<div class="text-center py-4 text-xs text-slate-600">No active tasks.</div>';
+                    return;
                 }
+
+                let html = '';
+                activeTasks.forEach(t => {
+                    html += `
+                    <div class="bg-slate-900 border border-slate-800 p-3.5 rounded-xl space-y-2 relative group overflow-hidden">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <span class="text-[10px] font-mono-custom text-slate-500 font-bold uppercase block">${t.id}</span>
+                                <span class="text-xs font-bold text-white">${t.source_node} &rarr; ${t.target_node}</span>
+                            </div>
+                            <span class="text-[9px] font-bold px-2 py-0.5 rounded ${
+                                t.status === 'ongoing' ? 'bg-indigo-950 text-indigo-400 border border-indigo-900/30 animate-pulse' : 'bg-slate-800 text-slate-400'
+                            }">
+                                ${t.status.toUpperCase()}
+                            </span>
+                        </div>
+
+                        <div class="flex items-center justify-between text-[10px] text-slate-400 pt-1">
+                            <span>Robot: <span class="font-bold text-slate-300 font-mono-custom">${t.robot_id || 'Auto-assigning'}</span></span>
+                            <span>ETA: <span class="font-bold text-emerald-400 font-mono-custom">${t.eta_minutes} min</span></span>
+                        </div>
+
+                        <div class="flex space-x-2 pt-1.5 border-t border-slate-950">
+                            <button onclick="triggerTransitSimulation('${t.id}')" class="flex-grow text-center py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold transition">
+                                <i class="fa-solid fa-play mr-1"></i> Simulate Transit Steps
+                            </button>
+                            <button onclick="cancelTask('${t.id}')" class="px-2 py-1.5 rounded bg-slate-950 hover:bg-rose-950/20 text-slate-500 hover:text-rose-400 border border-slate-800 transition">
+                                <i class="fa-solid fa-ban"></i>
+                            </button>
+                        </div>
+                    </div>
+                    `;
+                });
+                taskListEl.innerHTML = html;
             } catch (err) {
                 console.error(err);
             }
@@ -841,33 +864,22 @@
             const recurrence_interval = is_recurring ? document.getElementById('recurrenceInterval').value : 'none';
 
             try {
-                const res = await fetch('/api/tasks', {
+                const task = await apiRequest('/api/tasks', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify({ source_node, target_node, robot_id, scheduled_time, is_recurring, recurrence_interval })
+                    body: { source_node, target_node, robot_id, scheduled_time, is_recurring, recurrence_interval }
                 });
 
-                if (res.ok) {
-                    const task = await res.json();
-                    closeScheduleModal();
-                    await fetchTasks();
-                    await fillFormSelectors();
-                    
-                    // Show inside canvas
-                    const path = JSON.parse(task.path);
-                    drawMap(path);
-                    await triggerPathfinderCalculation(source_node, target_node);
-                    
-                    // Append chat message
-                    appendChatBubble('Rovex AI Dispatcher', `Stretcher transport scheduled successfully under ID <span class="font-bold text-slate-200 font-mono-custom">${task.id}</span>. Optimal transit A* path generated: ${path.join(' &rarr; ')}. ETA computed at ${task.eta_minutes} minutes. Click "Simulate Transit Steps" in the sidebar to execute the hardware sequence!`, false);
-                } else {
-                    const err = await res.json();
-                    alert("Dispatched schedule failed: " + err.detail);
-                }
+                closeScheduleModal();
+                await fetchTasks();
+                await fillFormSelectors();
+
+                const path = JSON.parse(task.path);
+                drawMap(path);
+                await triggerPathfinderCalculation(source_node, target_node);
+
+                appendChatBubble('Rovex AI Dispatcher', `Stretcher transport scheduled successfully under ID <span class="font-bold text-slate-200 font-mono-custom">${task.id}</span>. Optimal transit A* path generated: ${path.join(' &rarr; ')}. ETA computed at ${task.eta_minutes} minutes. Click "Simulate Transit Steps" in the sidebar to execute the hardware sequence!`, false);
             } catch (e) {
+                alert("Dispatched schedule failed: " + e.message);
                 console.error(e);
             }
         });
@@ -879,25 +891,17 @@
             const issue_description = document.getElementById('issueDescription').value;
 
             try {
-                const res = await fetch('/api/tasks/service-request', {
+                await apiRequest('/api/tasks/service-request', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify({ robot_id, issue_description })
+                    body: { robot_id, issue_description }
                 });
 
-                if (res.ok) {
-                    closeServiceModal();
-                    alert(`Maintenance request filed for ${robot_id}. This robot is now set to an emergency status 'error' and has been suspended from scheduled duties.`);
-                    await fillFormSelectors();
-                    appendChatBubble('Rovex AI Dispatcher', `Emergency Alert! Maintenance request successfully registered for robot <span class="font-bold font-mono-custom text-slate-200">${robot_id}</span>. Reason: "${issue_description}". The robot has been taken offline.`, false);
-                } else {
-                    const err = await res.json();
-                    alert(err.detail);
-                }
+                closeServiceModal();
+                alert(`Maintenance request filed for ${robot_id}. This robot is now set to an emergency status 'error' and has been suspended from scheduled duties.`);
+                await fillFormSelectors();
+                appendChatBubble('Rovex AI Dispatcher', `Emergency Alert! Maintenance request successfully registered for robot <span class="font-bold font-mono-custom text-slate-200">${robot_id}</span>. Reason: "${issue_description}". The robot has been taken offline.`, false);
             } catch (e) {
+                alert(e.message);
                 console.error(e);
             }
         });
@@ -910,24 +914,16 @@
             const weight = parseFloat(document.getElementById('weightVal').value);
 
             try {
-                const res = await fetch('/api/robots/graph/edge', {
+                await apiRequest('/api/robots/graph/edge', {
                     method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify({ node_a, node_b, weight })
+                    body: { node_a, node_b, weight }
                 });
 
-                if (res.ok) {
-                    closeWeightModal();
-                    await fetchMapLayout();
-                    appendChatBubble('Rovex AI Dispatcher', `Orchestrator adjusted path weight: Corridor link [${node_a} <-> ${node_b}] has been updated to weight ${weight}. This will dynamically force robots onto lower-weighted paths.`, false);
-                } else {
-                    const err = await res.json();
-                    alert(err.detail);
-                }
+                closeWeightModal();
+                await fetchMapLayout();
+                appendChatBubble('Rovex AI Dispatcher', `Orchestrator adjusted path weight: Corridor link [${node_a} <-> ${node_b}] has been updated to weight ${weight}. This will dynamically force robots onto lower-weighted paths.`, false);
             } catch (e) {
+                alert(e.message);
                 console.error(e);
             }
         });
@@ -936,15 +932,10 @@
         async function cancelTask(taskId) {
             if (!confirm(`Are you sure you want to cancel transport task ${taskId}?`)) return;
             try {
-                const res = await fetch(`/api/tasks/${taskId}/cancel`, {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (res.ok) {
-                    await fetchTasks();
-                    await fillFormSelectors();
-                    appendChatBubble('Rovex AI Dispatcher', `Task ${taskId} was cancelled. Associated robot has been freed.`, false);
-                }
+                await apiRequest(`/api/tasks/${taskId}/cancel`, { method: 'POST' });
+                await fetchTasks();
+                await fillFormSelectors();
+                appendChatBubble('Rovex AI Dispatcher', `Task ${taskId} was cancelled. Associated robot has been freed.`, false);
             } catch (e) {
                 console.error(e);
             }
@@ -954,35 +945,26 @@
         async function triggerTransitSimulation(taskId) {
             appendChatBubble('Rovex AI Dispatcher', `Starting real-time physical transit simulation for Task ${taskId}...`, false);
             try {
-                const res = await fetch(`/api/tasks/${taskId}/execute`, {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (res.ok) {
-                    const task = await res.json();
-                    const path = JSON.parse(task.path);
-                    
-                    // Simulate visual step progress
-                    let stepIdx = 0;
-                    const interval = setInterval(() => {
-                        if (stepIdx < path.length) {
-                            const activeNodes = path.slice(0, stepIdx + 1);
-                            drawMap(activeNodes);
-                            stepIdx++;
-                        } else {
-                            clearInterval(interval);
-                            fetchTasks();
-                            fillFormSelectors();
-                            drawMap(path);
-                            appendChatBubble('Rovex AI Dispatcher', `Simulation Completed! Task ${taskId} successfully finished. Robot arrived at destination node <span class="font-bold text-white">${path[path.length - 1]}</span> and is now idling. Check Admin Logs for detailed logs.`, false);
-                        }
-                    }, 1000);
-                    
-                } else {
-                    const err = await res.json();
-                    alert("Transit simulation failed: " + err.detail);
-                }
+                const task = await apiRequest(`/api/tasks/${taskId}/execute`, { method: 'POST' });
+                const path = JSON.parse(task.path);
+                
+                // Simulate visual step progress
+                let stepIdx = 0;
+                const interval = setInterval(() => {
+                    if (stepIdx < path.length) {
+                        const activeNodes = path.slice(0, stepIdx + 1);
+                        drawMap(activeNodes);
+                        stepIdx++;
+                    } else {
+                        clearInterval(interval);
+                        fetchTasks();
+                        fillFormSelectors();
+                        drawMap(path);
+                        appendChatBubble('Rovex AI Dispatcher', `Simulation Completed! Task ${taskId} successfully finished. Robot arrived at destination node <span class="font-bold text-white">${path[path.length - 1]}</span> and is now idling. Check Admin Logs for detailed logs.`, false);
+                    }
+                }, 1000);
             } catch (e) {
+                alert("Transit simulation failed: " + e.message);
                 console.error(e);
             }
         }
@@ -990,34 +972,25 @@
         // Run Path Finder Calculation Details visually
         async function triggerPathfinderCalculation(start_node, goal_node) {
             try {
-                const res = await fetch('/api/robots/path-planning', {
+                const data = await apiRequest('/api/robots/path-planning', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify({ start_node, goal_node })
+                    body: { start_node, goal_node }
                 });
 
-                if (res.ok) {
-                    const data = await res.json();
-                    
-                    document.getElementById('patherStatus').innerText = "Path solved successfully!";
-                    document.getElementById('patherDist').innerText = data.total_distance_meters + 'm';
-                    document.getElementById('patherCost').innerText = data.total_cost;
-                    document.getElementById('patherSteps').innerText = data.steps_taken;
-                    
-                    document.getElementById('pathDisplay').innerHTML = data.path.join(' &rarr; ');
-                    
-                    // Format Heuristics log
-                    let hConsole = '';
-                    data.algorithm_steps.forEach((step, idx) => {
-                        hConsole += `[Step ${idx+1}] Node: ${step.current_node.padEnd(16)} | g(n)=${step.g_score.toFixed(1).padEnd(5)} | h(n)=${step.heuristic.toFixed(1).padEnd(5)} | f(n)=${step.f_score.toFixed(1).padEnd(5)}\n`;
-                    });
-                    document.getElementById('heuristicConsole').innerText = hConsole;
-                    
-                    drawMap(data.path);
-                }
+                document.getElementById('patherStatus').innerText = "Path solved successfully!";
+                document.getElementById('patherDist').innerText = data.total_distance_meters + 'm';
+                document.getElementById('patherCost').innerText = data.total_cost;
+                document.getElementById('patherSteps').innerText = data.steps_taken;
+                
+                document.getElementById('pathDisplay').innerHTML = data.path.join(' &rarr; ');
+                
+                let hConsole = '';
+                data.algorithm_steps.forEach((step, idx) => {
+                    hConsole += `[Step ${idx+1}] Node: ${step.current_node.padEnd(16)} | g(n)=${step.g_score.toFixed(1).padEnd(5)} | h(n)=${step.heuristic.toFixed(1).padEnd(5)} | f(n)=${step.f_score.toFixed(1).padEnd(5)}\n`;
+                });
+                document.getElementById('heuristicConsole').innerText = hConsole;
+                
+                drawMap(data.path);
             } catch (err) {
                 console.error(err);
             }
@@ -1092,23 +1065,18 @@
         // Call the list robots API for chatbot interface
         async function triggerListRobotsAPI() {
             try {
-                const res = await fetch('/api/robots', {
-                    headers: { 'Authorization': `Bearer ${token}` }
+                const robots = await apiRequest('/api/robots');
+                let responseHtml = '<strong>PyMongo Records found (' + robots.length + '):</strong><ul class="list-disc pl-5 mt-2 space-y-2">';
+                robots.forEach(r => {
+                    responseHtml += `
+                    <li>
+                        <span class="font-bold text-white">${r.robot_id}</span> (${r.serial_number})<br>
+                        Status: <span class="text-indigo-400 font-semibold">${r.status}</span> | Location: ${r.location} | Battery: <span class="text-emerald-400">${r.battery}%</span> | Sanctioned: ${r.sanctioned}
+                    </li>
+                    `;
                 });
-                if (res.ok) {
-                    const robots = await res.json();
-                    let responseHtml = '<strong>PyMongo Records found (' + robots.length + '):</strong><ul class="list-disc pl-5 mt-2 space-y-2">';
-                    robots.forEach(r => {
-                        responseHtml += `
-                        <li>
-                            <span class="font-bold text-white">${r.robot_id}</span> (${r.serial_number})<br>
-                            Status: <span class="text-indigo-400 font-semibold">${r.status}</span> | Location: ${r.location} | Battery: <span class="text-emerald-400">${r.battery}%</span> | Sanctioned: ${r.sanctioned}
-                        </li>
-                        `;
-                    });
-                    responseHtml += '</ul>';
-                    appendChatBubble('Rovex AI Assistant', responseHtml, false);
-                }
+                responseHtml += '</ul>';
+                appendChatBubble('Rovex AI Assistant', responseHtml, false);
             } catch (err) {
                 appendChatBubble('Rovex AI Assistant', "Error connecting to PyMongo robots database.", false);
             }
@@ -1117,30 +1085,21 @@
         // Dispatch scheduler request from Chat Commands
         async function triggerTaskDispatchAPI(source_node, target_node) {
             try {
-                const res = await fetch('/api/tasks', {
+                const task = await apiRequest('/api/tasks', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify({ source_node, target_node, robot_id: null, scheduled_time: 'now', is_recurring: false, recurrence_interval: 'none' })
+                    body: { source_node, target_node, robot_id: null, scheduled_time: 'now', is_recurring: false, recurrence_interval: 'none' }
                 });
 
-                if (res.ok) {
-                    const task = await res.json();
-                    await fetchTasks();
-                    await fillFormSelectors();
-                    
-                    const path = JSON.parse(task.path);
-                    drawMap(path);
-                    await triggerPathfinderCalculation(source_node, target_node);
-                    
-                    appendChatBubble('Rovex AI Assistant', `<strong>SUCCESS: Stretcher Robot Dispatched!</strong><br><br>Task ID: <span class="font-mono-custom text-white font-bold">${task.id}</span><br>Route: ${path.join(' &rarr; ')}<br>Assigned Robot: ${task.robot_id || 'Waiting in Queue'}<br>ETA: ${task.eta_minutes} minutes.<br><br>Click <strong>'Simulate Transit Steps'</strong> on the sidebar task card to initiate execution!`, false);
-                } else {
-                    const err = await res.json();
-                    appendChatBubble('Rovex AI Assistant', `Failed to schedule: ${err.detail}`, false);
-                }
+                await fetchTasks();
+                await fillFormSelectors();
+                
+                const path = JSON.parse(task.path);
+                drawMap(path);
+                await triggerPathfinderCalculation(source_node, target_node);
+                
+                appendChatBubble('Rovex AI Assistant', `<strong>SUCCESS: Stretcher Robot Dispatched!</strong><br><br>Task ID: <span class="font-mono-custom text-white font-bold">${task.id}</span><br>Route: ${path.join(' &rarr; ')}<br>Assigned Robot: ${task.robot_id || 'Waiting in Queue'}<br>ETA: ${task.eta_minutes} minutes.<br><br>Click <strong>'Simulate Transit Steps'</strong> on the sidebar task card to initiate execution!`, false);
             } catch (e) {
+                appendChatBubble('Rovex AI Assistant', `Failed to schedule: ${e.message}`, false);
                 console.error(e);
             }
         }
