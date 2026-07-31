@@ -32,10 +32,24 @@ logging.basicConfig(
 )
 logger = logging.getLogger("rovex.main")
 
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app_instance: FastAPI):
+    """
+    FastAPI lifespan context manager. Triggers SQL and NoSQL memory database 
+    tables creation and applies seed mock records.
+    """
+    logger.info("Starting up Rovex Platform Backend...")
+    init_db()
+    logger.info("Databases and seeds initialized successfully.")
+    yield
+
 app = FastAPI(
     title="Rovex Hospital Robotics Backend Platform",
     description="A modular, production-ready backend prototype for hospital stretcher robots.",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 # Enable CORS for frontend and API accessibility
@@ -50,17 +64,8 @@ app.add_middleware(
 # Configure Jinja2 templates directory
 templates = Jinja2Templates(directory="app/templates")
 
-
-# Initialize database schemas and seed records on start
-@app.on_event("startup")
-def on_startup():
-    """
-    FastAPI startup event. Triggers SQL and NoSQL memory database tables 
-    and applies seed mock records.
-    """
-    logger.info("Starting up Rovex Platform Backend...")
-    init_db()
-    logger.info("Databases and seeds initialized successfully.")
+# Initialize database schemas immediately to guarantee tables exist across all threads/sessions
+init_db()
 
 
 # =====================================================================
