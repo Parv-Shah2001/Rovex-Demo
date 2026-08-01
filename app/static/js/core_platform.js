@@ -25,6 +25,10 @@ function canModifyEdgeWeights() {
     return CORRIDOR_WEIGHT_EDITOR_ROLES.has(userObj.role);
 }
 
+function canProvisionHospitalUsers() {
+    return userObj.role === 'supervisor';
+}
+
 function syncSidebarToggleIcon() {
     const toggleIcon = document.getElementById('sidebarToggleIcon');
     if (!toggleIcon) return;
@@ -99,6 +103,13 @@ window.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('adminPortalBtn').classList.remove('hidden');
     }
 
+    if (canProvisionHospitalUsers()) {
+        document.getElementById('supervisorUserAccessBtn').classList.remove('hidden');
+        document.getElementById('createUserOrganization').value = userObj.organization;
+    }
+
+    document.getElementById('userCreateForm').addEventListener('submit', submitCreateUserForm);
+
     // Set up Canvas
     canvas = document.getElementById('hospitalCanvas');
     ctx = canvas.getContext('2d');
@@ -150,6 +161,43 @@ function openWeightModal() {
 }
 function closeWeightModal() {
     setModalVisibility('weightModal', false);
+}
+function openUserCreateModal() {
+    setModalVisibility('userCreateModal', true);
+}
+function closeUserCreateModal() {
+    setModalVisibility('userCreateModal', false);
+    document.getElementById('userCreateErrorBox').classList.add('hidden');
+}
+
+async function submitCreateUserForm(event) {
+    event.preventDefault();
+    const errorBox = document.getElementById('userCreateErrorBox');
+    errorBox.classList.add('hidden');
+
+    const payload = {
+        full_name: document.getElementById('createUserFullName').value.trim(),
+        username: document.getElementById('createUserUsername').value.trim(),
+        email: document.getElementById('createUserEmail').value.trim(),
+        password: document.getElementById('createUserPassword').value,
+        role: document.getElementById('createUserRole').value,
+        organization: document.getElementById('createUserOrganization').value.trim(),
+    };
+
+    try {
+        await apiRequest('/api/users/register', {
+            method: 'POST',
+            body: payload,
+        });
+        document.getElementById('userCreateForm').reset();
+        document.getElementById('createUserOrganization').value = userObj.organization;
+        closeUserCreateModal();
+        appendChatBubble('Rovex AI Dispatcher', `Hospital access account <span class="font-bold text-slate-200">${payload.username}</span> was created successfully with role <span class="font-bold text-slate-200">${payload.role}</span> for ${payload.organization}.`, false);
+    } catch (error) {
+        errorBox.innerText = error.message || 'Failed to create hospital user.';
+        errorBox.classList.remove('hidden');
+        console.error(error);
+    }
 }
 
 // Clear Conversation Log

@@ -6,6 +6,7 @@ controls, and log streaming while reusing shared session/network helpers.
 */
 
 let selectedEngine = 'sql';
+const ROVEX_ORGANIZATION = 'Rovex Robotics Inc.';
 const adminSession = window.RovexCommon.ensureSession({
     requiredRole: 'admin',
     redirectPath: '/',
@@ -16,6 +17,34 @@ const userObj = adminSession ? adminSession.user : {};
 
 function handleLogout() {
     window.RovexCommon.logout('/');
+}
+
+function openCreateUserModal() {
+    document.getElementById('createUserModal').classList.remove('hidden');
+    syncCreateUserRoleState();
+}
+
+function closeCreateUserModal() {
+    document.getElementById('createUserModal').classList.add('hidden');
+    document.getElementById('createUserErrorBox').classList.add('hidden');
+}
+
+function syncCreateUserRoleState() {
+    const roleEl = document.getElementById('createRole');
+    const orgEl = document.getElementById('createOrganization');
+    if (!roleEl || !orgEl) return;
+
+    const isAdminRole = roleEl.value === 'admin';
+    orgEl.readOnly = isAdminRole;
+    orgEl.classList.toggle('text-slate-400', isAdminRole);
+    orgEl.classList.toggle('bg-slate-950/60', isAdminRole);
+    orgEl.classList.toggle('bg-slate-950', !isAdminRole);
+
+    if (isAdminRole) {
+        orgEl.value = ROVEX_ORGANIZATION;
+    } else if (orgEl.value === ROVEX_ORGANIZATION) {
+        orgEl.value = '';
+    }
 }
 
 function setDbEngine(engine) {
@@ -173,6 +202,39 @@ async function executeQuery() {
     }
 }
 
+async function submitCreateUserForm(event) {
+    event.preventDefault();
+    const errorBox = document.getElementById('createUserErrorBox');
+    errorBox.classList.add('hidden');
+
+    const payload = {
+        full_name: document.getElementById('createFullName').value.trim(),
+        username: document.getElementById('createUsername').value.trim(),
+        email: document.getElementById('createEmail').value.trim(),
+        password: document.getElementById('createPassword').value,
+        role: document.getElementById('createRole').value,
+        organization: document.getElementById('createOrganization').value.trim(),
+    };
+
+    try {
+        await window.RovexCommon.apiRequest('/api/users/register', {
+            method: 'POST',
+            token,
+            body: payload,
+        });
+        document.getElementById('createUserForm').reset();
+        syncCreateUserRoleState();
+        closeCreateUserModal();
+        await fetchUsersList();
+        await fetchDashboardStats();
+        alert(`User '${payload.username}' created successfully.`);
+    } catch (error) {
+        errorBox.innerText = error.message || 'Failed to create user.';
+        errorBox.classList.remove('hidden');
+        console.error(error);
+    }
+}
+
 function syntaxHighlight(json) {
     if (!json) return '';
     const escaped = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -195,6 +257,8 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
 
     document.getElementById('usernameVal').innerText = userObj.full_name;
+    document.getElementById('createUserForm').addEventListener('submit', submitCreateUserForm);
+    syncCreateUserRoleState();
     await fetchDashboardStats();
     await fetchUsersList();
     await fetchRobotsList();

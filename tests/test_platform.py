@@ -590,8 +590,10 @@ class TestRovexPlatform(unittest.TestCase):
         self.assertIn('/static/js/index.js', index_html)
         self.assertIn('/static/js/rovex-common.js', admin_html)
         self.assertIn('/static/js/admin.js', admin_html)
+        self.assertIn('createUserModal', admin_html)
         self.assertIn('/static/js/rovex-common.js', core_html)
         self.assertIn('/static/js/core_platform.js', core_html)
+        self.assertIn('userCreateModal', core_html)
 
     def test_template_loader_refreshes_changed_html_files(self):
         """

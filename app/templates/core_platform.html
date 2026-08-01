@@ -166,6 +166,11 @@
                         <i class="fa-solid fa-shield-halved mr-1"></i> Admin Sandbox Platform
                     </a>
                 </div>
+                <div id="supervisorUserAccessBtn" class="hidden pt-1.5 sidebar-hide-on-collapse">
+                    <button onclick="openUserCreateModal()" class="w-full text-center block py-1.5 rounded bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-bold tracking-wider uppercase transition">
+                        <i class="fa-solid fa-user-plus mr-1"></i> Add Hospital User
+                    </button>
+                </div>
             </div>
 
             <!-- Active / Ongoing Missions List -->
@@ -481,7 +486,67 @@
         </div>
     </div>
 
-        <script src="/static/js/rovex-common.js"></script>
+    <!-- 4. Supervisor User Creation Modal -->
+    <div id="userCreateModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm hidden px-4">
+        <div class="bg-slate-900 border border-slate-800 max-w-md w-full rounded-2xl p-6 space-y-4">
+            <div class="flex justify-between items-center pb-2 border-b border-slate-800">
+                <div>
+                    <h3 class="font-bold text-sm flex items-center space-x-2">
+                        <i class="fa-solid fa-user-plus text-indigo-400"></i>
+                        <span>Add Hospital User</span>
+                    </h3>
+                    <p class="text-[11px] text-slate-400 mt-1">Supervisors can provision sub-supervisor and employee accounts for their own hospital.</p>
+                </div>
+                <button onclick="closeUserCreateModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <form id="userCreateForm" class="space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5" for="createUserFullName">Full Name</label>
+                        <input id="createUserFullName" type="text" class="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 focus:outline-none px-3 py-2 rounded-xl text-xs" required>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5" for="createUserUsername">Username</label>
+                        <input id="createUserUsername" type="text" class="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 focus:outline-none px-3 py-2 rounded-xl text-xs" required>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5" for="createUserEmail">Email</label>
+                        <input id="createUserEmail" type="email" class="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 focus:outline-none px-3 py-2 rounded-xl text-xs" required>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5" for="createUserPassword">Temporary Password</label>
+                        <input id="createUserPassword" type="text" minlength="6" class="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 focus:outline-none px-3 py-2 rounded-xl text-xs" required>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5" for="createUserRole">Role</label>
+                        <select id="createUserRole" class="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 focus:outline-none px-3 py-2 rounded-xl text-xs" required>
+                            <option value="sub-supervisor">Sub-Supervisor</option>
+                            <option value="employee">Employee</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5" for="createUserOrganization">Organization</label>
+                        <input id="createUserOrganization" type="text" class="w-full bg-slate-950/60 border border-slate-800 px-3 py-2 rounded-xl text-xs text-slate-400" readonly>
+                    </div>
+                </div>
+
+                <div id="userCreateErrorBox" class="hidden text-xs bg-rose-500/10 border border-rose-500/20 text-rose-400 p-3 rounded-lg"></div>
+
+                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-xl text-xs transition">
+                    Create Hospital User <i class="fa-solid fa-chevron-right ml-1"></i>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script src="/static/js/rovex-common.js"></script>
     <script src="/static/js/core_platform.js"></script>
 
 </body>

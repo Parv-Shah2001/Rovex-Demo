@@ -49,8 +49,8 @@ tests/
 
 ### 🧑‍💼 1. Hierarchical User Management & RBAC
 Five pre-configured seed users demonstrate both role hierarchy and organization scoping:
-- **Rovex Admin (James Whitfield)**: Platform-wide rights across every hospital organization, including the admin dashboard, robot sanction controls, and sandbox query tools.
-- **Supervisor (Dr. Sarah Mitchell / St. Jude Hospital)**: Hospital manager rights inside St. Jude, including fleet oversight, staff visibility, and scoped account provisioning for that institution.
+- **Rovex Admin (James Whitfield)**: Platform-wide rights across every hospital organization, including the admin dashboard, robot sanction controls, sandbox query tools, and full cross-organization user provisioning.
+- **Supervisor (Dr. Sarah Mitchell / St. Jude Hospital)**: Hospital manager rights inside St. Jude, including fleet oversight, staff visibility, and scoped account provisioning for that institution through the Core Platform.
 - **Sub-Supervisor (Nurse Thomas Kelly / St. Jude Hospital)**: Dispatch rights for scheduling missions, reviewing live status, and adjusting corridor priorities.
 - **Employee (Orderly John Doe / St. Jude Hospital)**: Viewer-only rights plus service-request filing.
 - **Supervisor (Dr. Alan Grant / City General Hospital)**: A second hospital supervisor used to validate organization scoping and admin cross-organization visibility.
