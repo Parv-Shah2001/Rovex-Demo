@@ -111,8 +111,23 @@
             }
         }
         @media (min-width: 1280px) {
+            .core-main {
+                height: 100vh;
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+            }
             .core-content-split {
+                flex: 1 1 auto;
+                min-height: 0;
+                height: calc(100vh - 4rem);
                 grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+            }
+            .core-content-panel {
+                min-height: 0;
+                height: 100%;
+                overflow-y: auto;
+                overflow-x: hidden;
             }
         }
         /* Custom scrollbar */

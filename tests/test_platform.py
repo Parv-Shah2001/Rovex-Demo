@@ -606,6 +606,9 @@ class TestRovexPlatform(unittest.TestCase):
         self.assertIn("sidebar-collapsed", html)
         self.assertIn("toggleSidebar()", html)
         self.assertIn("@media (min-width: 768px)", html)
+        self.assertIn("@media (min-width: 1280px)", html)
+        self.assertIn("height: calc(100vh - 4rem)", html)
+        self.assertIn("overflow-y: auto", html)
 
     def test_admin_sandbox_rejects_mutating_sql_and_allows_read_only_ctes(self):
         """
