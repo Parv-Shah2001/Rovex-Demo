@@ -21,14 +21,14 @@ from app.core.auth import (
     is_admin,
 )
 from app.services.robot.schemas import (
-    RobotTelemetryPayload, 
-    RobotResponse, 
-    UpdateSanctionRequest, 
+    AStarPlanRequest,
+    FleetResponse,
+    RobotTelemetryPayload,
+    RobotResponse,
     UpdateEdgeWeightRequest,
-    AStarPlanRequest
+    UpdateSanctionRequest,
 )
 from app.services.robot import service as robot_service
-from app.services.robot import astar
 
 router = APIRouter(prefix="/api/robots", tags=["Robot Management"])
 
@@ -78,16 +78,29 @@ def list_robots(
     return robot_service.get_robots_by_organization(db, current_user["organization"])
 
 
+@router.get("/fleets", response_model=List[FleetResponse])
+def list_fleets(
+    current_user: Dict[str, Any] = Depends(get_current_user_from_cookie_or_header),
+    db: MockDatabase = Depends(get_nosql_db),
+):
+    """
+    Lists fleet summaries visible to the current user.
+
+    Admins can inspect every hospital fleet, while hospital staff remain scoped
+    to fleets inside their own organization.
+    """
+    if is_admin(current_user):
+        return robot_service.get_all_fleets(db)
+    return robot_service.get_fleets_by_organization(db, current_user["organization"])
+
+
 @router.get("/graph/layout", response_model=Dict[str, Any])
 def get_graph_layout(current_user: Dict[str, Any] = Depends(get_current_user_from_cookie_or_header)):
     """
     Returns the hospital layout graph, including 2D node coordinates and edge weights.
     Used by the frontend to render the visual corridor network.
     """
-    return {
-        "nodes": astar.hospital_map.get_nodes(),
-        "edges": astar.hospital_map.get_edges()
-    }
+    return robot_service.get_graph_layout()
 
 
 @router.put("/graph/edge", response_model=Dict[str, Any])
@@ -100,7 +113,7 @@ def adjust_corridor_weight(
     Allows supervisors and sub-supervisors to optimize robot fleet routing.
     Admins can also access this via the RBAC hierarchy.
     """
-    success = astar.hospital_map.update_edge_weight(payload.node_a, payload.node_b, payload.weight)
+    success = robot_service.adjust_corridor_weight(payload.node_a, payload.node_b, payload.weight)
     if not success:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -170,7 +183,7 @@ def modify_robot_sanction_status(
 @router.get("/{robot_id}/telemetry-logs", response_model=List[Dict[str, Any]])
 def get_robot_telemetry_history(
     robot_id: str,
-    limit: int = 15,
+    limit: int = Query(15, ge=1, le=200, description="Maximum telemetry records to return."),
     current_user: Dict[str, Any] = Depends(get_current_user_from_cookie_or_header),
     db: MockDatabase = Depends(get_nosql_db)
 ):
@@ -179,12 +192,10 @@ def get_robot_telemetry_history(
     - Rovex admins can view any robot's telemetry regardless of organization.
     - Hospital staff can only view telemetry for robots in their own organization.
     """
-    robot = robot_service.get_robot_by_id(db, robot_id)
-    if not robot:
-         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Robot not found")
-         
-    if not is_admin(current_user) and robot["organization"] != current_user["organization"]:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access Denied.")
-        
-    logs = robot_service.get_recent_telemetry(db, robot_id, limit)
-    return logs
+    robot = _get_robot_or_404(db, robot_id)
+    ensure_organization_access(
+        current_user,
+        robot["organization"],
+        detail="Access denied. This robot belongs to another institution.",
+    )
+    return robot_service.get_recent_telemetry(db, robot_id, limit)

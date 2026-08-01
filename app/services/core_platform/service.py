@@ -413,6 +413,7 @@ def submit_robot_service_request(
         {"robot_id": payload.robot_id},
         {"$set": {"last_problem": payload.issue_description, "status": "error", "assigned_task_id": None}}
     )
+    robot_service.synchronize_fleets(db_nosql)
 
     notification_service.log_system_notification(
         db=db_nosql,

@@ -51,7 +51,7 @@
     <main class="flex-grow max-w-7xl w-full mx-auto px-6 py-8 space-y-8">
         
         <!-- Dashboard Statistics Row -->
-        <section class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <section class="grid grid-cols-2 md:grid-cols-5 gap-4">
             <div class="bg-slate-900/50 border border-slate-800/80 p-5 rounded-xl space-y-2">
                 <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Total Connected Users</span>
                 <div class="flex items-center justify-between">
@@ -62,12 +62,21 @@
             </div>
 
             <div class="bg-slate-900/50 border border-slate-800/80 p-5 rounded-xl space-y-2">
-                <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Total Active Fleet</span>
+                <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Registered Fleets</span>
+                <div class="flex items-center justify-between">
+                    <span id="statFleets" class="text-2xl font-extrabold text-white">0</span>
+                    <i class="fa-solid fa-layer-group text-xl text-violet-400"></i>
+                </div>
+                <p class="text-[9px] text-slate-500">Organization-scoped fleet groups</p>
+            </div>
+
+            <div class="bg-slate-900/50 border border-slate-800/80 p-5 rounded-xl space-y-2">
+                <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Fleet Robots</span>
                 <div class="flex items-center justify-between">
                     <span id="statRobots" class="text-2xl font-extrabold text-white">0</span>
                     <i class="fa-solid fa-robot text-xl text-violet-500"></i>
                 </div>
-                <p class="text-[9px] text-slate-500">In mock document NoSQL</p>
+                <p class="text-[9px] text-slate-500">Robots assigned into hospital fleets</p>
             </div>
 
             <div class="bg-slate-900/50 border border-slate-800/80 p-5 rounded-xl space-y-2">
@@ -126,12 +135,12 @@
                 </div>
             </div>
 
-            <!-- NoSQL Robot Fleet (MongoDB Simulated) -->
+            <!-- Fleet Registry (MongoDB Simulated) -->
             <div class="bg-slate-900/30 border border-slate-800 p-6 rounded-2xl space-y-4">
                 <div class="flex justify-between items-center">
                     <h3 class="font-bold text-base flex items-center space-x-2">
-                        <i class="fa-solid fa-cubes text-violet-400"></i>
-                        <span>NoSQL Document Database: Robots (PyMongo)</span>
+                        <i class="fa-solid fa-layer-group text-violet-400"></i>
+                        <span>NoSQL Fleet Registry (PyMongo)</span>
                     </h3>
                     <span class="text-[9px] px-2 py-0.5 font-mono bg-violet-950 text-violet-400 border border-violet-900 rounded">PyMongo Mock</span>
                 </div>
@@ -140,22 +149,56 @@
                     <table class="w-full text-xs text-left">
                         <thead class="text-slate-400 font-bold bg-slate-950/40 border-b border-slate-800">
                             <tr>
-                                <th class="p-3">Robot ID</th>
-                                <th class="p-3">Macro-Location</th>
-                                <th class="p-3">Battery</th>
-                                <th class="p-3">State</th>
-                                <th class="p-3">Sanctioned</th>
+                                <th class="p-3">Fleet</th>
+                                <th class="p-3">Organization</th>
+                                <th class="p-3">Assigned Robots</th>
+                                <th class="p-3">Dispatchable</th>
                             </tr>
                         </thead>
-                        <tbody id="robotsTableBody">
+                        <tbody id="fleetsTableBody">
                             <tr>
-                                <td colspan="5" class="p-4 text-center text-slate-500">Loading robot fleet...</td>
+                                <td colspan="4" class="p-4 text-center text-slate-500">Loading fleet registry...</td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
             </div>
 
+        </section>
+
+        <!-- Robot Registry -->
+        <section class="bg-slate-900/30 border border-slate-800 p-6 rounded-2xl space-y-4">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h3 class="font-bold text-base flex items-center space-x-2">
+                        <i class="fa-solid fa-robot text-violet-400"></i>
+                        <span>Robot Registry & Sanction Controls</span>
+                    </h3>
+                    <p class="text-[11px] text-slate-400">Robots belong to organization-scoped fleets and can be sanctioned from this panel.</p>
+                </div>
+                <span class="text-[9px] px-2 py-0.5 font-mono bg-violet-950 text-violet-400 border border-violet-900 rounded">Fleet-linked robots</span>
+            </div>
+            
+            <div class="overflow-x-auto">
+                <table class="w-full text-xs text-left">
+                    <thead class="text-slate-400 font-bold bg-slate-950/40 border-b border-slate-800">
+                        <tr>
+                            <th class="p-3">Robot ID</th>
+                            <th class="p-3">Fleet</th>
+                            <th class="p-3">Organization</th>
+                            <th class="p-3">Location</th>
+                            <th class="p-3">Battery</th>
+                            <th class="p-3">State</th>
+                            <th class="p-3">Sanctioned</th>
+                        </tr>
+                    </thead>
+                    <tbody id="robotsTableBody">
+                        <tr>
+                            <td colspan="7" class="p-4 text-center text-slate-500">Loading robot registry...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </section>
 
         <!-- Live Streaming System Logs (Consolidated Data Pool) -->

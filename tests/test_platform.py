@@ -130,6 +130,13 @@ class TestRovexPlatform(unittest.TestCase):
         self.assertEqual(admin_visible, 4)  # All 4 seed robots
         self.assertEqual(supervisor_visible, 3)  # St. Jude has 3 robots
 
+        # Fleets are organization-scoped groupings of multiple robots.
+        all_fleets = robot_service.get_all_fleets(nosql_db)
+        st_jude_fleets = robot_service.get_fleets_by_organization(nosql_db, "St. Jude Hospital")
+        self.assertEqual(len(all_fleets), 3)
+        self.assertEqual(len(st_jude_fleets), 2)
+        self.assertTrue(any(fleet["total_robot_count"] >= 2 for fleet in st_jude_fleets))
+
 
     # =====================================================================
     # 3. USER SQL OLTP & RBAC TESTS
@@ -270,6 +277,7 @@ class TestRovexPlatform(unittest.TestCase):
         self.assertIsNotNone(robot)
         self.assertEqual(robot["robot_id"], robot_id)
         self.assertEqual(robot["organization"], "St. Jude Hospital")
+        self.assertEqual(robot["fleet_id"], "fleet-stj-acute")
         
         # Simulate concurrent telemetry packet ingestion
         telemetry_data = {
@@ -490,6 +498,7 @@ class TestRovexPlatform(unittest.TestCase):
         st_jude_alerts = notification_service.list_notifications_for_user(nosql_db, supervisor_user)
         admin_alerts = notification_service.list_notifications_for_user(nosql_db, admin_user)
 
+        self.assertTrue(all("organization" in alert for alert in admin_alerts))
         self.assertTrue(any(alert["message"] == "St. Jude scoped alert" for alert in st_jude_alerts))
         self.assertTrue(any(alert["message"] == "Queued St. Jude fleet alert" for alert in st_jude_alerts))
         self.assertFalse(any(alert["message"] == "City General scoped alert" for alert in st_jude_alerts))
@@ -563,6 +572,15 @@ class TestRovexPlatform(unittest.TestCase):
         )
         self.assertTrue(any(row["username"] == "sup_sarah" for row in cte_result))
 
+    def test_admin_dashboard_stats_include_fleet_counts(self):
+        """
+        Verifies admin stats expose explicit fleet counts alongside robot counts.
+        """
+        stats = admin_service.get_admin_dashboard_stats(self.db_sql, nosql_db)
+        self.assertEqual(stats["total_fleets"], 3)
+        self.assertEqual(stats["total_robots"], 4)
+        self.assertEqual(stats["un_sanctioned_robots"], 1)
+
     def test_html_dashboard_routes_disable_browser_caching(self):
         """
         Verifies the HTML dashboard responses explicitly disable caching so local
@@ -591,9 +609,11 @@ class TestRovexPlatform(unittest.TestCase):
         self.assertIn('/static/js/rovex-common.js', admin_html)
         self.assertIn('/static/js/admin.js', admin_html)
         self.assertIn('createUserModal', admin_html)
+        self.assertIn('fleetsTableBody', admin_html)
         self.assertIn('/static/js/rovex-common.js', core_html)
         self.assertIn('/static/js/core_platform.js', core_html)
         self.assertIn('userCreateModal', core_html)
+        self.assertIn('fleetSummaryPanel', core_html)
 
     def test_template_loader_refreshes_changed_html_files(self):
         """

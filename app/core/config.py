@@ -119,11 +119,44 @@ SEED_USERS = [
     }
 ]
 
+# Seed Fleets (NoSQL Database Seed)
+# A fleet is the organization-scoped operational grouping of multiple robots.
+SEED_FLEETS = [
+    {
+        "fleet_id": "fleet-stj-acute",
+        "organization": "St. Jude Hospital",
+        "fleet_name": "St. Jude Acute Care Fleet",
+        "fleet_type": "Acute Care",
+        "dispatch_zone": "Main inpatient corridors",
+        "robot_ids": ["rovi-01", "rovi-02"],
+        "notes": "Primary stretcher transport fleet covering critical patient movement.",
+    },
+    {
+        "fleet_id": "fleet-stj-support",
+        "organization": "St. Jude Hospital",
+        "fleet_name": "St. Jude Support & Recovery Fleet",
+        "fleet_type": "Overflow / Recovery",
+        "dispatch_zone": "Elevator and overflow lanes",
+        "robot_ids": ["rovi-04"],
+        "notes": "Overflow fleet used for lower-priority operations and maintenance reserve.",
+    },
+    {
+        "fleet_id": "fleet-cgh-general",
+        "organization": "City General Hospital",
+        "fleet_name": "City General Main Transport Fleet",
+        "fleet_type": "General Transport",
+        "dispatch_zone": "Outpatient to surgery corridors",
+        "robot_ids": ["rovi-03"],
+        "notes": "General stretcher fleet for City General's day-to-day movements.",
+    },
+]
+
 # Seed Robots (NoSQL Database Seed)
 SEED_ROBOTS = [
     {
         "robot_id": "rovi-01",
         "organization": "St. Jude Hospital",
+        "fleet_id": "fleet-stj-acute",
         "serial_number": "SN-R2D2-100412",
         "last_serviced": "2026-05-12T09:00:00Z",
         "last_problem": "Lidar recalibration required",
@@ -138,6 +171,7 @@ SEED_ROBOTS = [
     {
         "robot_id": "rovi-02",
         "organization": "St. Jude Hospital",
+        "fleet_id": "fleet-stj-acute",
         "serial_number": "SN-C3PO-330419",
         "last_serviced": "2026-06-20T10:15:00Z",
         "last_problem": "Slight wheel motor slipping - fixed",
@@ -152,6 +186,7 @@ SEED_ROBOTS = [
     {
         "robot_id": "rovi-03",
         "organization": "City General Hospital",
+        "fleet_id": "fleet-cgh-general",
         "serial_number": "SN-BB8-991200",
         "last_serviced": "2026-07-01T14:00:00Z",
         "last_problem": "None",
@@ -166,6 +201,7 @@ SEED_ROBOTS = [
     {
         "robot_id": "rovi-04",
         "organization": "St. Jude Hospital",
+        "fleet_id": "fleet-stj-support",
         "serial_number": "SN-BENDER-404404",
         "last_serviced": "2026-03-10T11:30:00Z",
         "last_problem": "Overheating issues - maintenance scheduled",
@@ -193,5 +229,6 @@ def get_config_summary() -> Dict[str, Any]:
         "valid_roles": list(VALID_ROLES),
         "log_path": LOG_FILE_PATH,
         "seed_users_count": len(SEED_USERS),
+        "seed_fleets_count": len(SEED_FLEETS),
         "seed_robots_count": len(SEED_ROBOTS)
     }

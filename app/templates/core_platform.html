@@ -146,7 +146,7 @@
                 </div>
                 <div class="sidebar-hide-on-collapse">
                     <h2 class="text-base font-bold tracking-tight">ROVEX CORE</h2>
-                    <span class="text-[9px] block text-slate-500 uppercase tracking-widest font-semibold">St. Jude Hospital</span>
+                    <span id="sidebarOrganizationLabel" class="text-[9px] block text-slate-500 uppercase tracking-widest font-semibold">Hospital Fleet</span>
                 </div>
             </div>
 
@@ -183,6 +183,17 @@
                 <div class="space-y-2" id="ongoingMissionsList">
                     <!-- Loaded dynamically -->
                     <div class="text-center py-4 text-xs text-slate-600">No active tasks.</div>
+                </div>
+            </div>
+
+            <!-- Fleet Registry Summary -->
+            <div class="space-y-3 sidebar-hide-on-collapse">
+                <div class="flex justify-between items-center text-xs">
+                    <span class="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Hospital Fleets</span>
+                    <button onclick="fetchFleetSummary()" class="text-[10px] text-indigo-400 hover:text-indigo-300 font-semibold"><i class="fa-solid fa-rotate-right"></i></button>
+                </div>
+                <div id="fleetSummaryPanel" class="bg-slate-900/40 border border-slate-800/80 p-4 rounded-xl space-y-3 text-xs text-slate-400">
+                    <div class="text-slate-500">Loading fleet registry...</div>
                 </div>
             </div>
 

@@ -16,6 +16,77 @@ from app.services.robot.schemas import RobotTelemetryPayload
 logger = logging.getLogger("rovex.robot_service")
 
 
+def _build_fleet_summary(fleet_doc: Dict[str, Any], robots: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """
+    Builds a derived fleet summary document from fleet metadata and its robots.
+    """
+    return {
+        **fleet_doc,
+        "robot_ids": [robot["robot_id"] for robot in robots],
+        "total_robot_count": len(robots),
+        "active_robot_count": sum(1 for robot in robots if robot.get("status") in {"idle", "transit", "charging"}),
+        "sanctioned_robot_count": sum(1 for robot in robots if robot.get("sanctioned") is True),
+        "unsanctioned_robot_count": sum(1 for robot in robots if robot.get("sanctioned") is False),
+        "idle_robot_count": sum(1 for robot in robots if robot.get("status") == "idle" and robot.get("sanctioned") is True),
+    }
+
+
+def synchronize_fleets(db: MockDatabase) -> List[Dict[str, Any]]:
+    """
+    Recomputes fleet membership summaries from the current robot registry.
+
+    A fleet is the organization-scoped grouping of multiple robots, so this
+    helper keeps fleet aggregate data aligned whenever robot assignments or
+    sanction states change.
+    """
+    fleet_collection = db["fleets"]
+    fleets = [fleet for fleet in fleet_collection.find({})]
+    robots = get_all_robots(db)
+    robots_by_fleet: Dict[str, List[Dict[str, Any]]] = {}
+    for robot in robots:
+        robots_by_fleet.setdefault(robot.get("fleet_id"), []).append(robot)
+
+    synchronized_fleets = []
+    for fleet in fleets:
+        summarized = _build_fleet_summary(fleet, robots_by_fleet.get(fleet["fleet_id"], []))
+        fleet_collection.update_one(
+            {"fleet_id": fleet["fleet_id"]},
+            {"$set": {
+                "robot_ids": summarized["robot_ids"],
+                "total_robot_count": summarized["total_robot_count"],
+                "active_robot_count": summarized["active_robot_count"],
+                "sanctioned_robot_count": summarized["sanctioned_robot_count"],
+                "unsanctioned_robot_count": summarized["unsanctioned_robot_count"],
+                "idle_robot_count": summarized["idle_robot_count"],
+            }}
+        )
+        synchronized_fleets.append(summarized)
+
+    return sorted(synchronized_fleets, key=lambda fleet: (fleet["organization"], fleet["fleet_name"]))
+
+
+def get_all_fleets(db: MockDatabase) -> List[Dict[str, Any]]:
+    """
+    Returns all fleet summaries across every organization.
+    """
+    return synchronize_fleets(db)
+
+
+def get_fleets_by_organization(db: MockDatabase, organization: str) -> List[Dict[str, Any]]:
+    """
+    Returns fleet summaries for a single hospital organization.
+    """
+    return [fleet for fleet in synchronize_fleets(db) if fleet["organization"] == organization]
+
+
+def get_fleet_by_id(db: MockDatabase, fleet_id: str) -> Optional[Dict[str, Any]]:
+    """
+    Resolves a single fleet summary by ID after refreshing aggregate state.
+    """
+    fleets = synchronize_fleets(db)
+    return next((fleet for fleet in fleets if fleet["fleet_id"] == fleet_id), None)
+
+
 def get_graph_layout() -> Dict[str, Any]:
     """
     Returns the active hospital routing layout in a frontend-friendly shape.
@@ -117,6 +188,7 @@ def ingest_robot_telemetry(db: MockDatabase, telemetry: RobotTelemetryPayload) -
         new_robot = {
             "robot_id": telemetry.robot_id,
             "organization": "Unknown",
+            "fleet_id": "unassigned",
             "serial_number": f"SN-UNKNOWN-{telemetry.robot_id.upper()}",
             "last_serviced": datetime.utcnow().isoformat(),
             "last_problem": "Ad-hoc initialization",
@@ -129,7 +201,8 @@ def ingest_robot_telemetry(db: MockDatabase, telemetry: RobotTelemetryPayload) -
             "y_m": telemetry.localization.y_m
         }
         db["robots"].insert_one(new_robot)
-        
+
+    synchronize_fleets(db)
     return payload_dict
 
 
@@ -148,6 +221,7 @@ def update_robot_sanction(db: MockDatabase, robot_id: str, sanctioned: bool) -> 
         update_fields["assigned_task_id"] = None
         
     db["robots"].update_one({"robot_id": robot_id}, {"$set": update_fields})
+    synchronize_fleets(db)
     return get_robot_by_id(db, robot_id)
 
 
@@ -176,6 +250,7 @@ def update_robot_status_and_location(
     }
     
     db["robots"].update_one({"robot_id": robot_id}, {"$set": update_fields})
+    synchronize_fleets(db)
     return get_robot_by_id(db, robot_id)
 
 

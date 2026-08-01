@@ -10,7 +10,7 @@ Welcome to the **Rovex Fleet Orchestration Backend**. This prototype is designed
 2. **Pydantic v2**: Handles and strictly validates incoming concurrent synthetic telemetry payloads sent by robots.
 3. **Dual Mock Storage Engine** (No external database installation required):
    - **Relational SQL Database (SQLite in-memory)**: Emulates a transactional PostgreSQL OLTP system using genuine, production-standard **SQLAlchemy ORM** configurations for users, roles, and scheduled task records.
-   - **Document NoSQL Database (Custom PyMongo Mock)**: A thread-safe, in-memory collection-based document database emulating MongoDB/PyMongo. Stores and queries flexible unstructured robot profiles, history log pools, and system alerts.
+   - **Document NoSQL Database (Custom PyMongo Mock)**: A thread-safe, in-memory collection-based document database emulating MongoDB/PyMongo. Stores and queries flexible unstructured fleet registries, robot profiles, telemetry streams, and system alerts.
 4. **Lightweight HMAC-SHA256 Token Sessions**: Cryptographically signed access credentials with zero external OAuth library bloat, ensuring maximum system independence and speed.
 5. **Tailwind CSS & Canvas JS Frontend**: Serves interactive, responsive administrative panels and an AI chat workspace with zero node/npm dependency overhead. The Core Platform shell also uses a small amount of custom CSS to guarantee a sticky, collapsible Gemini-style sidebar and a fully scrollable main workspace without introducing a frontend build step.
 
@@ -55,8 +55,9 @@ Five pre-configured seed users demonstrate both role hierarchy and organization 
 - **Employee (Orderly John Doe / St. Jude Hospital)**: Viewer-only rights plus service-request filing.
 - **Supervisor (Dr. Alan Grant / City General Hospital)**: A second hospital supervisor used to validate organization scoping and admin cross-organization visibility.
 
-### 🤖 2. Telemetry Ingestion (Pydantic Validation)
+### 🤖 2. Fleet-Aware Robot Telemetry Ingestion (Pydantic Validation)
 Supports high-frequency telemetry packets, validating physical speed and steering parameters, battery mah capacities, 2D coordinates, safety proximity obstacles, and camera/lidar diagnostics.
+Each robot is explicitly attached to an organization-scoped fleet, and fleet summaries are recomputed from robot state so the platform reflects true hospital fleet operations rather than treating each robot as its own fleet.
 
 ### 🗺️ 3. A* Macro-Routing & Orchestration
 Implements the **A\* Search Algorithm** on a 2D graph representing hospital zones (Reception, ICU, Pharmacy, Wards, etc.).
@@ -70,12 +71,18 @@ Categorizes all alerts into **CRITICAL, GENERAL, ANALYTICS, SUGGESTIONS, and MAR
 - Alerts are also written to a MongoDB-like index enabling instant rendering on frontend cards.
 - Notification records now carry organization scope so hospital users only see alerts from their own institution, while Rovex admins retain global visibility.
 
-### 🛠️ 5. Admin Sandboxed Database Query Workspace
+### 🚚 5. Fleet Registry & Robot Governance
+Hospital organizations operate fleets, and each fleet is the real grouping that owns multiple robots.
+- **Fleet Registry**: The admin dashboard now surfaces organization-scoped fleet entries, assigned robot counts, dispatchable robot counts, and sanctioned vs. unsanctioned totals.
+- **Robot Governance**: Individual robots still carry live telemetry, sanction state, and maintenance history, but they are now shown as members of fleets instead of being treated as standalone fleets.
+- **Admin Controls**: Rovex admins can continue sanctioning/un-sanctioning robots from the admin portal while seeing the resulting effect on fleet readiness.
+
+### 🛠️ 6. Admin Sandboxed Database Query Workspace
 Provides a secure console where administrators can run manual queries:
 - **SQL Console**: Executes read-only SQL statements (including read-only CTEs such as `WITH scoped AS (...) SELECT * FROM scoped`) against the active OLTP database.
 - **NoSQL Console**: Parses and executes PyMongo-style query strings (e.g. `db.robots.find({"battery": {"$lt": 50}})` or `db.notifications.find({"category": "CRITICAL"})`) directly.
 
-### 💬 6. Gemini-Style Chat Assistant & Canvas Visualizer
+### 💬 7. Gemini-Style Chat Assistant & Canvas Visualizer
 The face-to-face employee workspace is styled with a sleek **Gemini-like AI Chat Input**. 
 - Users can type commands in natural language: e.g. **"schedule from Reception to ICU"** or **"list active robots"**.
 - The frontend parses commands programmatically to trigger underlying REST APIs.

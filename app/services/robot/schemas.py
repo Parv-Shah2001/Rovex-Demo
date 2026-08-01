@@ -85,6 +85,7 @@ class RobotResponse(BaseModel):
     """
     robot_id: str
     organization: str
+    fleet_id: str
     serial_number: str
     last_serviced: str
     last_problem: str
@@ -95,6 +96,24 @@ class RobotResponse(BaseModel):
     location: str
     x_m: float
     y_m: float
+
+
+class FleetResponse(BaseModel):
+    """
+    Represents an organization-scoped fleet summary that groups multiple robots.
+    """
+    fleet_id: str
+    organization: str
+    fleet_name: str
+    fleet_type: str
+    dispatch_zone: str
+    notes: str
+    robot_ids: list[str]
+    total_robot_count: int
+    active_robot_count: int
+    sanctioned_robot_count: int
+    unsanctioned_robot_count: int
+    idle_robot_count: int
 
 
 class UpdateSanctionRequest(BaseModel):

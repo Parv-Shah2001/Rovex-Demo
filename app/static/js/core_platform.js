@@ -97,6 +97,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('welcomeName').innerText = userObj.full_name.split(' ')[1] || userObj.full_name;
     document.getElementById('userRoleBadge').innerText = userObj.role.toUpperCase();
     document.getElementById('userInitials').innerText = userObj.full_name.split(' ').map(n => n[0]).join('');
+    document.getElementById('sidebarOrganizationLabel').innerText = userObj.organization || 'Hospital Fleet';
 
     // Hide/Show Admin Dashboard link based on role — only Rovex admins see it
     if (userObj.role === 'admin') {
@@ -117,6 +118,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     // Load data
     await fetchMapLayout();
     await fetchTasks();
+    await fetchFleetSummary();
     await fillFormSelectors();
 });
 
@@ -207,6 +209,60 @@ function clearChat() {
     chatHistory.innerHTML = '';
     chatHistory.classList.add('hidden');
     welcome.classList.remove('hidden');
+}
+
+async function fetchFleetSummary() {
+    const fleetPanel = document.getElementById('fleetSummaryPanel');
+    if (!fleetPanel) return;
+
+    try {
+        const fleets = await apiRequest('/api/robots/fleets');
+        if (!fleets.length) {
+            fleetPanel.innerHTML = '<div class="text-slate-500">No fleet registry data available.</div>';
+            return;
+        }
+
+        const totalRobots = fleets.reduce((sum, fleet) => sum + fleet.total_robot_count, 0);
+        const totalIdle = fleets.reduce((sum, fleet) => sum + fleet.idle_robot_count, 0);
+        const totalUnsanctioned = fleets.reduce((sum, fleet) => sum + fleet.unsanctioned_robot_count, 0);
+        const fleetRows = fleets.map((fleet) => `
+            <div class="border border-slate-800 rounded-lg p-3 bg-slate-950/40">
+                <div class="flex justify-between items-start gap-3">
+                    <div>
+                        <div class="text-[11px] font-bold text-white">${fleet.fleet_name}</div>
+                        <div class="text-[10px] text-slate-500 font-mono-custom">${fleet.fleet_id}</div>
+                    </div>
+                    <span class="text-[10px] px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">${fleet.total_robot_count} robots</span>
+                </div>
+                <div class="mt-2 text-[10px] text-slate-400 flex justify-between">
+                    <span>Idle ready: <span class="text-emerald-400 font-semibold">${fleet.idle_robot_count}</span></span>
+                    <span>Unsanctioned: <span class="text-rose-400 font-semibold">${fleet.unsanctioned_robot_count}</span></span>
+                </div>
+            </div>
+        `).join('');
+
+        fleetPanel.innerHTML = `
+            <div class="grid grid-cols-3 gap-2 text-center">
+                <div class="bg-slate-950/60 rounded-lg border border-slate-800 p-2">
+                    <span class="block text-[9px] uppercase tracking-wider text-slate-500">Fleets</span>
+                    <span class="text-sm font-bold text-white">${fleets.length}</span>
+                </div>
+                <div class="bg-slate-950/60 rounded-lg border border-slate-800 p-2">
+                    <span class="block text-[9px] uppercase tracking-wider text-slate-500">Robots</span>
+                    <span class="text-sm font-bold text-white">${totalRobots}</span>
+                </div>
+                <div class="bg-slate-950/60 rounded-lg border border-slate-800 p-2">
+                    <span class="block text-[9px] uppercase tracking-wider text-slate-500">Idle Ready</span>
+                    <span class="text-sm font-bold text-emerald-400">${totalIdle}</span>
+                </div>
+            </div>
+            <div class="text-[10px] text-slate-500">Unsanctioned robots across this organization: <span class="text-rose-400 font-semibold">${totalUnsanctioned}</span></div>
+            <div class="space-y-2">${fleetRows}</div>
+        `;
+    } catch (error) {
+        fleetPanel.innerHTML = '<div class="text-rose-400">Failed to load fleet registry.</div>';
+        console.error(error);
+    }
 }
 
 // Auto fills dropdown options
@@ -350,6 +406,7 @@ async function fetchTasks() {
 
         if (activeTasks.length === 0) {
             taskListEl.innerHTML = '<div class="text-center py-4 text-xs text-slate-600">No active tasks.</div>';
+            await fetchFleetSummary();
             return;
         }
 
@@ -386,6 +443,7 @@ async function fetchTasks() {
             `;
         });
         taskListEl.innerHTML = html;
+        await fetchFleetSummary();
     } catch (err) {
         console.error(err);
     }

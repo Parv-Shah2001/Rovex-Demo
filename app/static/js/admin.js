@@ -80,6 +80,7 @@ async function fetchDashboardStats() {
     try {
         const stats = await window.RovexCommon.apiRequest('/api/admin/stats', { token });
         document.getElementById('statUsers').innerText = stats.total_users;
+        document.getElementById('statFleets').innerText = stats.total_fleets;
         document.getElementById('statRobots').innerText = stats.total_robots;
         document.getElementById('statBattery').innerText = stats.average_robot_battery + '%';
         document.getElementById('statUnsanctioned').innerText = stats.un_sanctioned_robots;
@@ -117,6 +118,26 @@ async function fetchUsersList() {
     }
 }
 
+async function fetchFleetsList() {
+    try {
+        const fleets = await window.RovexCommon.apiRequest('/api/robots/fleets', { token });
+        let html = '';
+        fleets.forEach((fleet) => {
+            html += `
+            <tr class="border-b border-slate-800 hover:bg-slate-900/20 transition">
+                <td class="p-3 font-semibold text-white">${fleet.fleet_name}<span class="text-[9px] font-normal block text-slate-500 font-mono-custom">${fleet.fleet_id}</span></td>
+                <td class="p-3 text-slate-400">${fleet.organization}<span class="text-[9px] font-normal block text-slate-500">${fleet.dispatch_zone}</span></td>
+                <td class="p-3 text-slate-300">${fleet.total_robot_count}<span class="text-[9px] font-normal block text-slate-500">${fleet.robot_ids.join(', ') || 'No robots assigned'}</span></td>
+                <td class="p-3 text-slate-300">${fleet.idle_robot_count}<span class="text-[9px] font-normal block text-slate-500">${fleet.sanctioned_robot_count} sanctioned / ${fleet.unsanctioned_robot_count} unsanctioned</span></td>
+            </tr>
+            `;
+        });
+        document.getElementById('fleetsTableBody').innerHTML = html || '<tr><td colspan="4" class="p-4 text-center text-slate-500">No fleets registered.</td></tr>';
+    } catch (error) {
+        console.error('Fleet list fetch error', error);
+    }
+}
+
 async function fetchRobotsList() {
     try {
         const robots = await window.RovexCommon.apiRequest('/api/robots', { token });
@@ -125,6 +146,8 @@ async function fetchRobotsList() {
             html += `
             <tr class="border-b border-slate-800 hover:bg-slate-900/20 transition">
                 <td class="p-3 font-bold text-white">${robot.robot_id} <span class="text-[9px] font-normal block text-slate-500 font-mono-custom">${robot.serial_number}</span></td>
+                <td class="p-3 text-slate-400">${robot.fleet_id}</td>
+                <td class="p-3 text-slate-400">${robot.organization}</td>
                 <td class="p-3 text-slate-400">${robot.location}</td>
                 <td class="p-3 font-semibold ${robot.battery > 50 ? 'text-emerald-400' : robot.battery > 20 ? 'text-amber-400' : 'text-rose-400'}">${robot.battery}%</td>
                 <td class="p-3">
@@ -161,6 +184,7 @@ async function toggleRobotSanction(robotId, currentSanction) {
             token,
             body: { sanctioned: !currentSanction },
         });
+        await fetchFleetsList();
         await fetchRobotsList();
         await fetchDashboardStats();
         await fetchLogs();
@@ -194,6 +218,7 @@ async function executeQuery() {
         });
         queryBox.innerHTML = syntaxHighlight(JSON.stringify(data.data, null, 2));
         await fetchUsersList();
+        await fetchFleetsList();
         await fetchRobotsList();
         await fetchDashboardStats();
     } catch (error) {
@@ -261,6 +286,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     syncCreateUserRoleState();
     await fetchDashboardStats();
     await fetchUsersList();
+    await fetchFleetsList();
     await fetchRobotsList();
     await fetchLogs();
 });

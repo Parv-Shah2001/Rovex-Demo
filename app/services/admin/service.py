@@ -165,12 +165,13 @@ def get_admin_dashboard_stats(db_sql: Session, db_nosql: MockDatabase) -> Dict[s
         pending_tasks = db_sql.query(TaskSQL).filter(TaskSQL.status == "pending").count()
         completed_tasks = db_sql.query(TaskSQL).filter(TaskSQL.status == "completed").count()
         
+        fleets = [fleet for fleet in db_nosql["fleets"].find({})]
         robots = [robot for robot in db_nosql["robots"].find({})]
+        fleet_count = len(fleets)
         robot_count = len(robots)
         online_robots = sum(1 for r in robots if r.get("status") in ["idle", "transit", "charging"] and r.get("sanctioned") is True)
         un_sanctioned_count = sum(1 for r in robots if r.get("sanctioned") is False)
-        
-        # Calculate average battery
+
         avg_battery = 0.0
         if robot_count > 0:
             avg_battery = sum(r.get("battery", 0.0) for r in robots) / robot_count
@@ -180,6 +181,7 @@ def get_admin_dashboard_stats(db_sql: Session, db_nosql: MockDatabase) -> Dict[s
             "total_tasks": task_count,
             "pending_tasks": pending_tasks,
             "completed_tasks": completed_tasks,
+            "total_fleets": fleet_count,
             "total_robots": robot_count,
             "online_robots": online_robots,
             "un_sanctioned_robots": un_sanctioned_count,
