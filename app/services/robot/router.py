@@ -23,6 +23,7 @@ from app.core.auth import (
 from app.services.robot.schemas import (
     AStarPlanRequest,
     FleetResponse,
+    RobotCreateRequest,
     RobotTelemetryPayload,
     RobotResponse,
     UpdateEdgeWeightRequest,
@@ -44,6 +45,46 @@ def _get_robot_or_404(db: MockDatabase, robot_id: str) -> Dict[str, Any]:
             detail=f"Robot with ID '{robot_id}' was not found."
         )
     return robot
+
+
+@router.post("", response_model=RobotResponse, status_code=status.HTTP_201_CREATED)
+def create_robot(
+    payload: RobotCreateRequest,
+    current_user: Dict[str, Any] = Depends(RBACChecker(["admin"])),
+    db: MockDatabase = Depends(get_nosql_db),
+):
+    """
+    Registers a new robot in the platform registry.
+    Restricted to Rovex admins because robot onboarding is a global fleet-governance action.
+    """
+    try:
+        return robot_service.add_robot(db, payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+
+@router.delete("/{robot_id}", response_model=Dict[str, Any])
+def delete_robot(
+    robot_id: str,
+    current_user: Dict[str, Any] = Depends(RBACChecker(["admin"])),
+    db: MockDatabase = Depends(get_nosql_db),
+):
+    """
+    Removes a robot from the registry when it is not attached to an active task.
+    Restricted to Rovex admins.
+    """
+    try:
+        removed_robot = robot_service.remove_robot(db, robot_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+    if not removed_robot:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Robot with ID '{robot_id}' was not found.")
+    return {
+        "status": "success",
+        "detail": f"Robot '{robot_id}' removed from the fleet registry.",
+        "removed_robot": removed_robot,
+    }
 
 
 @router.post("/telemetry", response_model=Dict[str, Any], status_code=status.HTTP_201_CREATED)

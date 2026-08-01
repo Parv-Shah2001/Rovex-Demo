@@ -11,7 +11,7 @@ from datetime import datetime
 
 from app.core.database import MockDatabase
 from app.services.robot.astar import hospital_map, plan_astar_path
-from app.services.robot.schemas import RobotTelemetryPayload
+from app.services.robot.schemas import RobotCreateRequest, RobotTelemetryPayload
 
 logger = logging.getLogger("rovex.robot_service")
 
@@ -85,6 +85,54 @@ def get_fleet_by_id(db: MockDatabase, fleet_id: str) -> Optional[Dict[str, Any]]
     """
     fleets = synchronize_fleets(db)
     return next((fleet for fleet in fleets if fleet["fleet_id"] == fleet_id), None)
+
+
+def add_robot(db: MockDatabase, payload: RobotCreateRequest) -> Dict[str, Any]:
+    """
+    Registers a new robot under an existing organization fleet.
+    """
+    if get_robot_by_id(db, payload.robot_id):
+        raise ValueError(f"Robot '{payload.robot_id}' already exists.")
+
+    fleet = db["fleets"].find_one({"fleet_id": payload.fleet_id})
+    if not fleet:
+        raise ValueError(f"Fleet '{payload.fleet_id}' does not exist.")
+    if fleet["organization"] != payload.organization:
+        raise ValueError("Robot organization must match the selected fleet organization.")
+
+    robot_doc = {
+        "robot_id": payload.robot_id,
+        "organization": payload.organization,
+        "fleet_id": payload.fleet_id,
+        "serial_number": payload.serial_number,
+        "last_serviced": payload.last_serviced,
+        "last_problem": payload.last_problem,
+        "sanctioned": payload.sanctioned,
+        "battery": payload.battery,
+        "status": payload.status,
+        "assigned_task_id": None,
+        "location": payload.location,
+        "x_m": payload.x_m,
+        "y_m": payload.y_m,
+    }
+    db["robots"].insert_one(robot_doc)
+    synchronize_fleets(db)
+    return get_robot_by_id(db, payload.robot_id)
+
+
+def remove_robot(db: MockDatabase, robot_id: str) -> Optional[Dict[str, Any]]:
+    """
+    Removes a robot from the registry when it is no longer active in the fleet.
+    """
+    robot = get_robot_by_id(db, robot_id)
+    if not robot:
+        return None
+    if robot.get("assigned_task_id"):
+        raise ValueError("Cannot remove a robot while it is still assigned to an active task.")
+
+    db["robots"].delete_one({"robot_id": robot_id})
+    synchronize_fleets(db)
+    return robot
 
 
 def get_graph_layout() -> Dict[str, Any]:

@@ -166,9 +166,12 @@
                         <i class="fa-solid fa-shield-halved mr-1"></i> Admin Sandbox Platform
                     </a>
                 </div>
-                <div id="supervisorUserAccessBtn" class="hidden pt-1.5 sidebar-hide-on-collapse">
+                <div id="supervisorUserAccessBtn" class="hidden pt-1.5 sidebar-hide-on-collapse space-y-2">
                     <button onclick="openUserCreateModal()" class="w-full text-center block py-1.5 rounded bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-bold tracking-wider uppercase transition">
                         <i class="fa-solid fa-user-plus mr-1"></i> Add Hospital User
+                    </button>
+                    <button onclick="openOrganizationTreeModal()" class="w-full text-center block py-1.5 rounded bg-slate-900 hover:bg-slate-800 text-slate-300 text-[10px] font-bold tracking-wider uppercase border border-slate-700 transition">
+                        <i class="fa-solid fa-sitemap mr-1"></i> Org Structure
                     </button>
                 </div>
             </div>
@@ -497,7 +500,26 @@
         </div>
     </div>
 
-    <!-- 4. Supervisor User Creation Modal -->
+    <!-- 4. Organization Tree Modal -->
+    <div id="organizationTreeModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm hidden px-4">
+        <div class="bg-slate-900 border border-slate-800 max-w-4xl w-full rounded-2xl p-6 space-y-4 max-h-[85vh] overflow-hidden flex flex-col">
+            <div class="flex justify-between items-center pb-2 border-b border-slate-800">
+                <div>
+                    <h3 class="font-bold text-sm flex items-center space-x-2">
+                        <i class="fa-solid fa-sitemap text-indigo-400"></i>
+                        <span>Organization Structure</span>
+                    </h3>
+                    <p class="text-[11px] text-slate-400 mt-1">Controller tree and fleet-wide robot readiness for this hospital.</p>
+                </div>
+                <button onclick="closeOrganizationTreeModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div id="organizationTreeModalContent" class="flex-1 overflow-auto space-y-4 text-sm text-slate-300">
+                <div class="text-slate-500">Loading organization structure...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 5. Supervisor User Creation Modal -->
     <div id="userCreateModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm hidden px-4">
         <div class="bg-slate-900 border border-slate-800 max-w-md w-full rounded-2xl p-6 space-y-4">
             <div class="flex justify-between items-center pb-2 border-b border-slate-800">

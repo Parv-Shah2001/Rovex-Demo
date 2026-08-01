@@ -116,6 +116,24 @@ class FleetResponse(BaseModel):
     idle_robot_count: int
 
 
+class RobotCreateRequest(BaseModel):
+    """
+    Schema for onboarding a new robot into an existing organization fleet.
+    """
+    robot_id: str = Field(..., description="Unique robot identifier")
+    organization: str = Field(..., description="Owning hospital organization")
+    fleet_id: str = Field(..., description="Fleet assignment within the organization")
+    serial_number: str = Field(..., description="Hardware serial number")
+    last_serviced: str = Field(..., description="Most recent service timestamp")
+    last_problem: str = Field("None", description="Latest known maintenance note")
+    sanctioned: bool = Field(True, description="Whether the robot is approved for dispatch")
+    battery: float = Field(..., ge=0.0, le=100.0, description="Current battery percentage")
+    status: str = Field(..., description="Current robot state such as idle, transit, charging, or error")
+    location: str = Field(..., description="Named map location where the robot is parked")
+    x_m: float = Field(..., description="Current x-coordinate in meters")
+    y_m: float = Field(..., description="Current y-coordinate in meters")
+
+
 class UpdateSanctionRequest(BaseModel):
     """
     Schema to sanction or un-sanction a robot device. Un-sanctioning blocks tasks.

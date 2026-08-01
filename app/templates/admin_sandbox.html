@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Sandbox - Rovex</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #090d16; }
+        .font-mono-custom { font-family: 'Fira Code', monospace; }
+    </style>
+</head>
+<body class="text-slate-100 min-h-screen flex flex-col">
+    <nav class="border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md px-6 py-4 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                    <i class="fa-solid fa-flask-vial text-xl text-white"></i>
+                </div>
+                <div>
+                    <span class="text-lg font-bold tracking-tight bg-gradient-to-r from-white to-emerald-300 bg-clip-text text-transparent">ADVANCED SANDBOX</span>
+                    <span class="text-[10px] block text-slate-400 font-medium tracking-widest uppercase">Rovex Admin Inspection Workspace</span>
+                </div>
+            </div>
+            <div class="flex items-center gap-3 flex-wrap justify-center sm:justify-end">
+                <span id="sandboxUserBadge" class="text-xs bg-slate-800 px-3 py-1.5 rounded-lg text-slate-300 font-medium"></span>
+                <a href="/admin" class="text-xs bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-400 border border-indigo-500/30 px-3 py-1.5 rounded-lg transition"><i class="fa-solid fa-gauge-high mr-1"></i> Dashboard</a>
+                <a href="/admin/organizations" class="text-xs bg-violet-600/15 hover:bg-violet-600/25 text-violet-300 border border-violet-500/30 px-3 py-1.5 rounded-lg transition"><i class="fa-solid fa-sitemap mr-1"></i> Organizations</a>
+                <button onclick="window.RovexCommon.logout('/')" class="text-xs bg-rose-950/30 hover:bg-rose-950/60 text-rose-400 border border-rose-900/40 px-3 py-1.5 rounded-lg transition"><i class="fa-solid fa-right-from-bracket mr-1"></i> Logout</button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="flex-grow max-w-7xl w-full mx-auto px-6 py-8 space-y-8">
+        <section class="bg-slate-900/50 border border-slate-800 p-6 rounded-2xl space-y-4">
+            <h1 class="text-xl font-bold">Sandbox Catalog</h1>
+            <p class="text-sm text-slate-400">Explore available SQL tables, NoSQL collections, and copy starter queries into the editor. Destructive operations like DELETE and ALTER remain blocked.</p>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="bg-slate-950/60 border border-slate-800 rounded-xl p-4 space-y-3">
+                    <h2 class="text-sm font-semibold text-white">SQL Catalog</h2>
+                    <div id="sqlTablesList" class="space-y-2 text-sm text-slate-300"></div>
+                    <div id="sqlExamplesList" class="space-y-2"></div>
+                </div>
+                <div class="bg-slate-950/60 border border-slate-800 rounded-xl p-4 space-y-3">
+                    <h2 class="text-sm font-semibold text-white">NoSQL Catalog</h2>
+                    <div id="nosqlCollectionsList" class="space-y-2 text-sm text-slate-300"></div>
+                    <div id="nosqlExamplesList" class="space-y-2"></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="bg-slate-900/60 border border-slate-800 p-6 rounded-2xl space-y-6">
+            <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-lg font-bold">Advanced Query Workspace</h2>
+                    <p class="text-xs text-slate-400">Read-oriented inspection is supported for both SQL and NoSQL. Use SHOW TABLES, DESCRIBE, PRAGMA, db.listCollections(), find, distinct, aggregate, and countDocuments.</p>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <button id="sandboxBtnSql" onclick="setSandboxEngine('sql')" class="p-3 rounded-xl border border-indigo-700 bg-indigo-950/20 text-indigo-400 font-bold text-xs flex items-center justify-center space-x-2 transition">
+                        <i class="fa-solid fa-database"></i><span>SQL</span>
+                    </button>
+                    <button id="sandboxBtnNoSql" onclick="setSandboxEngine('nosql')" class="p-3 rounded-xl border border-slate-800 bg-slate-950 text-slate-500 font-bold text-xs flex items-center justify-center space-x-2 transition">
+                        <i class="fa-solid fa-cubes"></i><span>NoSQL</span>
+                    </button>
+                </div>
+            </div>
+            <textarea id="sandboxQueryEditor" rows="8" class="w-full bg-slate-950 font-mono-custom text-xs p-4 rounded-xl border border-slate-800 focus:border-emerald-500 focus:outline-none text-emerald-400 whitespace-pre leading-relaxed">SHOW TABLES</textarea>
+            <div class="flex justify-end">
+                <button onclick="executeSandboxQuery()" class="bg-gradient-to-r from-emerald-600 to-violet-600 hover:from-emerald-500 hover:to-violet-500 text-white font-bold text-xs px-6 py-2.5 rounded-xl transition shadow-lg shadow-emerald-600/10 hover:shadow-emerald-600/25">
+                    <i class="fa-solid fa-play mr-1.5"></i> Run Sandbox Query
+                </button>
+            </div>
+            <div class="bg-black/90 border border-slate-800/80 rounded-xl p-4 overflow-x-auto">
+                <pre id="sandboxQueryResult" class="text-[11px] font-mono-custom text-slate-300 max-h-[24rem] overflow-y-auto leading-relaxed select-text">Execution outputs will be displayed here...</pre>
+            </div>
+        </section>
+    </main>
+
+    <script src="/static/js/rovex-common.js"></script>
+    <script src="/static/js/admin-sandbox.js"></script>
+</body>
+</html>

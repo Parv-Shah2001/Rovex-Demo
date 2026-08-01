@@ -28,16 +28,19 @@ app/
 │   └── auth.py             # HMAC crypt token sessions & RBAC Dependency Injection
 ├── services/
 │   ├── user/               # User Management Service (SQL, register, login, RBAC shifts)
-│   ├── robot/              # Robot Management Service (NoSQL, A* router, telemetry validation)
+│   ├── robot/              # Robot Management Service (NoSQL, fleet-aware robot registry, A* routing)
 │   ├── notification/       # Notification Service (Alerts, category priority, physical logs)
-│   ├── admin/              # Admin Platform (router, schemas, dashboard stats, DB query sandbox)
+│   ├── organization/       # Organization domain (controller trees, fleet views, org metadata/history)
+│   ├── admin/              # Admin Platform (dashboard stats, drill-down metrics, advanced sandbox)
 │   └── core_platform/      # Core Platform (router + service layer for scheduling and mission orchestration)
 ├── static/
 │   └── js/                 # Shared/page-specific browser bundles served via FastAPI StaticFiles
 ├── templates/              # HTML frontend templates served directly from FastAPI file reads
-│   ├── index.html          # Dynamic login panel & RBAC account credentials card
-│   ├── admin.html          # Sandboxed query browser, log panel, and device sanction controls
-│   └── core_platform.html  # Gemini-style chat portal and live 2D canvas navigation map
+│   ├── index.html               # Dynamic login panel & RBAC account credentials card
+│   ├── admin.html               # Main admin dashboard, metrics, fleet registry, onboarding actions
+│   ├── admin_organizations.html # Dedicated organization management page with trees/history/fleets
+│   ├── admin_sandbox.html       # Dedicated advanced SQL/NoSQL sandbox explorer
+│   └── core_platform.html       # Gemini-style chat portal and live 2D canvas navigation map
 ├── main.py                 # Core application entrypoint and module mounters
 tests/
 └── test_platform.py        # Complete unit test suite (Seeded auth, A*, NoSQL & SQL operations)
@@ -73,22 +76,31 @@ Categorizes all alerts into **CRITICAL, GENERAL, ANALYTICS, SUGGESTIONS, and MAR
 
 ### 🚚 5. Fleet Registry & Robot Governance
 Hospital organizations operate fleets, and each fleet is the real grouping that owns multiple robots.
-- **Fleet Registry**: The admin dashboard now surfaces organization-scoped fleet entries, assigned robot counts, dispatchable robot counts, and sanctioned vs. unsanctioned totals.
+- **Fleet Registry**: The admin dashboard surfaces organization-scoped fleet entries, assigned robot counts, dispatchable robot counts, and sanctioned vs. unsanctioned totals.
 - **Robot Governance**: Individual robots still carry live telemetry, sanction state, and maintenance history, but they are now shown as members of fleets instead of being treated as standalone fleets.
-- **Admin Controls**: Rovex admins can continue sanctioning/un-sanctioning robots from the admin portal while seeing the resulting effect on fleet readiness.
+- **Admin Controls**: Rovex admins can onboard new robots, remove inactive robots, and sanction / un-sanction robots from the admin dashboard while seeing the resulting effect on fleet readiness.
 
-### 🛠️ 6. Admin Sandboxed Database Query Workspace
-Provides a secure console where administrators can run manual queries:
-- **SQL Console**: Executes read-only SQL statements (including read-only CTEs such as `WITH scoped AS (...) SELECT * FROM scoped`) against the active OLTP database.
-- **NoSQL Console**: Parses and executes PyMongo-style query strings (e.g. `db.robots.find({"battery": {"$lt": 50}})` or `db.notifications.find({"category": "CRITICAL"})`) directly.
+### 🏥 6. Organization Control Center
+Rovex admins can inspect dedicated organization pages that expose:
+- full controller trees grouped into supervisor / sub-supervisor / employee branches,
+- organization metadata such as location, service tier, controller device, contract owner, and deployment notes,
+- Rovex deployment history timelines,
+- fleet-wise robot status panels including recent alert snippets and telemetry timestamps.
+Supervisors can also open a lighter organization-structure popup from the Core Platform for their own hospital.
 
-### 💬 7. Gemini-Style Chat Assistant & Canvas Visualizer
+### 🛠️ 7. Admin Sandboxed Database Query Workspace
+The admin portal now includes a dedicated advanced sandbox page rather than embedding the whole explorer in the dashboard.
+- **SQL Console**: Supports read-oriented inspection commands such as `SHOW TABLES`, `DESCRIBE users`, `PRAGMA table_info(...)`, `SELECT ...`, and read-only CTEs.
+- **NoSQL Console**: Supports `db.listCollections()`, `find`, `find_one`, `distinct`, `aggregate`, and `countDocuments` commands.
+- **Blocked Commands**: destructive or schema-mutating actions like DELETE and ALTER remain explicitly disallowed.
+
+### 💬 8. Gemini-Style Chat Assistant & Canvas Visualizer
 The face-to-face employee workspace is styled with a sleek **Gemini-like AI Chat Input**. 
 - Users can type commands in natural language: e.g. **"schedule from Reception to ICU"** or **"list active robots"**.
 - The frontend parses commands programmatically to trigger underlying REST APIs.
 - A live **2D HTML5 Canvas** renders the hospital layout, highlighting optimal paths and showing robot movements coordinate-by-coordinate in real-time.
 - On desktop screens, the Core Platform behaves like a sticky app shell: a collapsible left operations rail stays pinned while the chat/map workspace scrolls independently.
-- On desktop screens, the Core Platform behaves like a sticky app shell: a collapsible left operations rail stays pinned while the chat/map workspace scrolls independently.
+- Supervisors can open a non-prominent organization-structure modal to review controller hierarchy and fleet readiness for their hospital.
 
 ---
 

@@ -20,7 +20,7 @@ from sqlalchemy import Boolean, Column, DateTime, Float, Integer, String, create
 from sqlalchemy.orm import Session, declarative_base, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.core.config import SEED_USERS, SEED_FLEETS, SEED_ROBOTS, LOG_FILE_PATH
+from app.core.config import SEED_USERS, SEED_ORGANIZATIONS, SEED_FLEETS, SEED_ROBOTS, LOG_FILE_PATH
 
 # Configure logging
 logger = logging.getLogger("rovex.database")
@@ -441,7 +441,13 @@ def init_db():
     finally:
         db.close()
 
-    # 3. Seed NoSQL fleets and robots
+    # 3. Seed organization, fleet, and robot registry collections
+    organization_collection = nosql_db["organizations"]
+    if organization_collection.count_documents({}) == 0:
+        for organization in SEED_ORGANIZATIONS:
+            organization_collection.insert_one(organization)
+        logger.info(f"Successfully seeded {len(SEED_ORGANIZATIONS)} organizations in Mock PyMongo.")
+
     fleet_collection = nosql_db["fleets"]
     if fleet_collection.count_documents({}) == 0:
         for fleet in SEED_FLEETS:
@@ -457,7 +463,7 @@ def init_db():
     # 4. Ensure telemetry and notification collections exist
     nosql_db["telemetry"]
     nosql_db["notifications"]
-    logger.info("Telemetry, fleet, and log collections ready.")
+    logger.info("Telemetry, organization, fleet, and log collections ready.")
 
     # 5. Create empty log file if not exists
     try:

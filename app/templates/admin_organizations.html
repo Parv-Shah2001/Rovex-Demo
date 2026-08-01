@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Organization Management - Rovex</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #090d16; }
+        .font-mono-custom { font-family: 'Fira Code', monospace; }
+    </style>
+</head>
+<body class="text-slate-100 min-h-screen flex flex-col">
+    <nav class="border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md px-6 py-4 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-violet-600 flex items-center justify-center shadow-lg shadow-violet-500/20">
+                    <i class="fa-solid fa-sitemap text-xl text-white"></i>
+                </div>
+                <div>
+                    <span class="text-lg font-bold tracking-tight bg-gradient-to-r from-white to-violet-300 bg-clip-text text-transparent">ORGANIZATION CONTROL CENTER</span>
+                    <span class="text-[10px] block text-slate-400 font-medium tracking-widest uppercase">Rovex Admin View</span>
+                </div>
+            </div>
+            <div class="flex items-center gap-3 flex-wrap justify-center sm:justify-end">
+                <span id="usernameBadge" class="text-xs bg-slate-800 px-3 py-1.5 rounded-lg text-slate-300 font-medium"></span>
+                <a href="/admin" class="text-xs bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-400 border border-indigo-500/30 px-3 py-1.5 rounded-lg transition"><i class="fa-solid fa-gauge-high mr-1"></i> Dashboard</a>
+                <a href="/admin/sandbox" class="text-xs bg-emerald-600/15 hover:bg-emerald-600/25 text-emerald-300 border border-emerald-500/30 px-3 py-1.5 rounded-lg transition"><i class="fa-solid fa-flask-vial mr-1"></i> Sandbox</a>
+                <button onclick="window.RovexCommon.logout('/')" class="text-xs bg-rose-950/30 hover:bg-rose-950/60 text-rose-400 border border-rose-900/40 px-3 py-1.5 rounded-lg transition"><i class="fa-solid fa-right-from-bracket mr-1"></i> Logout</button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="flex-grow max-w-7xl w-full mx-auto px-6 py-8 space-y-8">
+        <section class="bg-slate-900/50 border border-slate-800 p-6 rounded-2xl space-y-4">
+            <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div>
+                    <h1 class="text-xl font-bold">Organization Management</h1>
+                    <p class="text-sm text-slate-400">Inspect controller trees, fleet composition, individual robot state, and Rovex deployment history for every hospital organization.</p>
+                </div>
+                <div class="w-full lg:w-80">
+                    <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5" for="organizationSelect">Organization</label>
+                    <select id="organizationSelect" class="w-full bg-slate-950 border border-slate-800 focus:border-violet-500 focus:outline-none px-3 py-2 rounded-xl text-sm"></select>
+                </div>
+            </div>
+        </section>
+
+        <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="lg:col-span-2 bg-slate-900/40 border border-slate-800 p-6 rounded-2xl space-y-4">
+                <div class="flex justify-between items-center">
+                    <h2 class="font-bold text-base">Organization Profile</h2>
+                    <span id="orgServiceTierBadge" class="text-[10px] px-2 py-1 rounded-full bg-violet-500/10 text-violet-300 border border-violet-500/20">Tier</span>
+                </div>
+                <div id="organizationProfileCards" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+                <div class="bg-slate-950/60 border border-slate-800 rounded-xl p-4">
+                    <h3 class="text-sm font-semibold text-white mb-2">Rovex Deployment History</h3>
+                    <div id="organizationHistoryTimeline" class="space-y-2 text-sm text-slate-300"></div>
+                </div>
+            </div>
+            <div class="bg-slate-900/40 border border-slate-800 p-6 rounded-2xl space-y-4">
+                <h2 class="font-bold text-base">Controller Tree</h2>
+                <div id="organizationTreePanel" class="space-y-4"></div>
+            </div>
+        </section>
+
+        <section class="bg-slate-900/40 border border-slate-800 p-6 rounded-2xl space-y-4">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h2 class="font-bold text-base">Fleet & Robot Status</h2>
+                    <p class="text-[11px] text-slate-400">Fleet-wise robot readiness, assignment state, and recent telemetry / notification snippets.</p>
+                </div>
+            </div>
+            <div id="organizationFleetsPanel" class="space-y-4"></div>
+        </section>
+    </main>
+
+    <script src="/static/js/rovex-common.js"></script>
+    <script src="/static/js/admin-organizations.js"></script>
+</body>
+</html>

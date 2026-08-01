@@ -24,6 +24,7 @@ from app.services.robot.router import router as robot_router
 from app.services.notification.router import router as notification_router
 from app.services.admin.router import router as admin_router
 from app.services.core_platform.router import router as core_platform_router
+from app.services.organization.router import router as organization_router
 
 # Configure global application logger
 logging.basicConfig(
@@ -141,10 +142,25 @@ def serve_core_platform_page(request: Request):
 @app.get("/admin", response_class=HTMLResponse)
 def serve_admin_platform_page(request: Request):
     """
-    Renders the Admin Sandbox and database query tool.
-    Restricted to Rovex Admins only. Client-side JS blocks non-admins, but we can also guard here.
+    Renders the main Admin control-center dashboard.
     """
     return _html_response("admin.html")
+
+
+@app.get("/admin/organizations", response_class=HTMLResponse)
+def serve_admin_organizations_page(request: Request):
+    """
+    Renders the dedicated organization management page for Rovex admins.
+    """
+    return _html_response("admin_organizations.html")
+
+
+@app.get("/admin/sandbox", response_class=HTMLResponse)
+def serve_admin_sandbox_page(request: Request):
+    """
+    Renders the dedicated advanced sandbox page for Rovex admins.
+    """
+    return _html_response("admin_sandbox.html")
 
 
 # =====================================================================
@@ -173,3 +189,4 @@ app.include_router(robot_router)
 app.include_router(notification_router)
 app.include_router(admin_router)
 app.include_router(core_platform_router)
+app.include_router(organization_router)

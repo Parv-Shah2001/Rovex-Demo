@@ -23,9 +23,10 @@ from app.core.database import MockCollection, SessionLocal, TaskSQL, Base, engin
 from app.services.user import service as user_service
 from app.services.user.schemas import UserCreate
 from app.services.robot import service as robot_service
-from app.services.robot.schemas import RobotTelemetryPayload
+from app.services.robot.schemas import RobotCreateRequest, RobotTelemetryPayload
 from app.services.robot.astar import HospitalGraph, plan_astar_path, hospital_map
 from app.services.notification import service as notification_service
+from app.services.organization import service as organization_service
 from app.services.admin import service as admin_service
 from app.services.core_platform.router import schedule_transit_task
 from app.services.core_platform.schemas import TaskCreatePayload
@@ -33,6 +34,8 @@ from app.main import (
     serve_core_platform_page,
     serve_index_page,
     serve_admin_platform_page,
+    serve_admin_organizations_page,
+    serve_admin_sandbox_page,
     _load_template,
     _html_cache,
     TEMPLATES_DIR,
@@ -261,6 +264,21 @@ class TestRovexPlatform(unittest.TestCase):
         reloaded = collection.find_one({"robot_id": "copy-test"})
         self.assertEqual(reloaded["meta"]["battery"], 90)
 
+    def test_organization_detail_contains_controller_tree_and_fleet_rollups(self):
+        """
+        Verifies organization-detail payloads expose controller hierarchy and
+        fleet-aware robot detail for admin and supervisor-facing views.
+        """
+        admin_user = {"username": "rovex_admin", "role": "admin", "organization": config.ROVEX_ORGANIZATION}
+        detail = organization_service.get_organization_detail(self.db_sql, nosql_db, admin_user, "St. Jude Hospital")
+
+        self.assertEqual(detail["organization"], "St. Jude Hospital")
+        self.assertGreaterEqual(len(detail["controller_tree"]["supervisors"]), 1)
+        self.assertGreaterEqual(len(detail["fleets"]), 1)
+        self.assertTrue(any(robot["fleet_id"] == "fleet-stj-acute" for fleet in detail["fleets"] for robot in fleet["robots"]))
+        self.assertIn("location", detail)
+        self.assertIn("rovex_history", detail)
+
 
     # =====================================================================
     # 4. ROBOT PROFILE & INGESTION TELEMETRY (NOSQL) TESTS
@@ -325,6 +343,37 @@ class TestRovexPlatform(unittest.TestCase):
         self.assertEqual(updated_robot["y_m"], 5.0)
         self.assertEqual(updated_robot["assigned_task_id"], "test-mission-104")
         self.assertEqual(updated_robot["status"], "transit")
+
+    def test_robot_onboarding_and_removal_updates_fleet_registry(self):
+        """
+        Verifies robot onboarding/removal updates fleet counts and preserves
+        organization-to-fleet consistency rules.
+        """
+        new_robot = robot_service.add_robot(
+            nosql_db,
+            RobotCreateRequest(
+                robot_id="rovi-99",
+                organization="City General Hospital",
+                fleet_id="fleet-cgh-general",
+                serial_number="SN-TEST-999999",
+                last_serviced="2026-08-01T10:00:00Z",
+                last_problem="None",
+                sanctioned=True,
+                battery=88.0,
+                status="idle",
+                location="Reception",
+                x_m=0.0,
+                y_m=0.0,
+            ),
+        )
+        self.assertEqual(new_robot["fleet_id"], "fleet-cgh-general")
+        fleet = robot_service.get_fleet_by_id(nosql_db, "fleet-cgh-general")
+        self.assertIn("rovi-99", fleet["robot_ids"])
+
+        removed_robot = robot_service.remove_robot(nosql_db, "rovi-99")
+        self.assertEqual(removed_robot["robot_id"], "rovi-99")
+        fleet_after = robot_service.get_fleet_by_id(nosql_db, "fleet-cgh-general")
+        self.assertNotIn("rovi-99", fleet_after["robot_ids"])
 
     def test_nosql_robot_emergency_telemetry_preserves_error_status(self):
         """
@@ -572,14 +621,41 @@ class TestRovexPlatform(unittest.TestCase):
         )
         self.assertTrue(any(row["username"] == "sup_sarah" for row in cte_result))
 
+        show_tables = admin_service.execute_sandbox_sql(self.db_sql, "SHOW TABLES")
+        self.assertTrue(any(row["name"] == "users" for row in show_tables))
+
+        describe_users = admin_service.execute_sandbox_sql(self.db_sql, "DESCRIBE users")
+        self.assertTrue(any(row["name"] == "username" for row in describe_users))
+
+        collection_list = admin_service.execute_sandbox_nosql(nosql_db, "db.listCollections()")
+        self.assertTrue(any(row["name"] == "robots" for row in collection_list))
+
+        distinct_fleets = admin_service.execute_sandbox_nosql(nosql_db, "db.robots.distinct('fleet_id')")
+        self.assertTrue(any(row["fleet_id"] == "fleet-stj-acute" for row in distinct_fleets))
+
     def test_admin_dashboard_stats_include_fleet_counts(self):
         """
         Verifies admin stats expose explicit fleet counts alongside robot counts.
         """
         stats = admin_service.get_admin_dashboard_stats(self.db_sql, nosql_db)
+        self.assertEqual(stats["total_organizations"], 2)
         self.assertEqual(stats["total_fleets"], 3)
         self.assertEqual(stats["total_robots"], 4)
         self.assertEqual(stats["un_sanctioned_robots"], 1)
+
+    def test_admin_metric_details_and_sandbox_catalog(self):
+        """
+        Verifies metric drill-down payloads and advanced sandbox catalog metadata
+        are available for the expanded admin portal.
+        """
+        metric_detail = admin_service.get_metric_detail(self.db_sql, nosql_db, "total_organizations")
+        self.assertEqual(metric_detail["metric_key"], "total_organizations")
+        self.assertTrue(any(item["organization"] == "St. Jude Hospital" for item in metric_detail["items"]))
+
+        sandbox_catalog = admin_service.get_sandbox_catalog(self.db_sql, nosql_db)
+        self.assertIn("users", sandbox_catalog["sql_tables"])
+        self.assertIn("robots", sandbox_catalog["nosql_collections"])
+        self.assertTrue(any(example == "SHOW TABLES" for example in sandbox_catalog["sql_examples"]))
 
     def test_html_dashboard_routes_disable_browser_caching(self):
         """
@@ -590,6 +666,8 @@ class TestRovexPlatform(unittest.TestCase):
             serve_index_page(None),
             serve_core_platform_page(None),
             serve_admin_platform_page(None),
+            serve_admin_organizations_page(None),
+            serve_admin_sandbox_page(None),
         ):
             self.assertEqual(route_response.status_code, 200)
             for header_name, header_value in HTML_NO_CACHE_HEADERS.items():
@@ -602,6 +680,8 @@ class TestRovexPlatform(unittest.TestCase):
         """
         index_html = serve_index_page(None).body.decode("utf-8")
         admin_html = serve_admin_platform_page(None).body.decode("utf-8")
+        admin_org_html = serve_admin_organizations_page(None).body.decode("utf-8")
+        admin_sandbox_html = serve_admin_sandbox_page(None).body.decode("utf-8")
         core_html = serve_core_platform_page(None).body.decode("utf-8")
 
         self.assertIn('/static/js/rovex-common.js', index_html)
@@ -609,10 +689,16 @@ class TestRovexPlatform(unittest.TestCase):
         self.assertIn('/static/js/rovex-common.js', admin_html)
         self.assertIn('/static/js/admin.js', admin_html)
         self.assertIn('createUserModal', admin_html)
+        self.assertIn('createRobotModal', admin_html)
         self.assertIn('fleetsTableBody', admin_html)
+        self.assertIn('/static/js/admin-organizations.js', admin_org_html)
+        self.assertIn('organizationSelect', admin_org_html)
+        self.assertIn('/static/js/admin-sandbox.js', admin_sandbox_html)
+        self.assertIn('sandboxQueryEditor', admin_sandbox_html)
         self.assertIn('/static/js/rovex-common.js', core_html)
         self.assertIn('/static/js/core_platform.js', core_html)
         self.assertIn('userCreateModal', core_html)
+        self.assertIn('organizationTreeModal', core_html)
         self.assertIn('fleetSummaryPanel', core_html)
 
     def test_template_loader_refreshes_changed_html_files(self):

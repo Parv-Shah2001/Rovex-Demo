@@ -119,6 +119,50 @@ SEED_USERS = [
     }
 ]
 
+# Seed Organizations (NoSQL Database Seed)
+# Stores hospital metadata and Rovex deployment history for organization management views.
+SEED_ORGANIZATIONS = [
+    {
+        "organization": "St. Jude Hospital",
+        "location": {
+            "campus": "Main Phoenix Campus",
+            "address": "2401 E. Camelback Rd, Phoenix, AZ 85016",
+            "city": "Phoenix",
+            "state": "Arizona",
+            "country": "USA",
+        },
+        "service_tier": "Enterprise Acute Care",
+        "deployed_since": "2025-11-03",
+        "fleet_controller_device": "RDX-FLEET-CTRL-STJ-01",
+        "contract_owner": "Dr. Sarah Mitchell",
+        "notes": "High-throughput stretcher orchestration across ICU, wards, and elevators.",
+        "rovex_history": [
+            "2025-11-03: Initial 2-robot pilot went live in the inpatient wing.",
+            "2026-02-14: Acute care fleet expanded for ICU and ER peak-load coverage.",
+            "2026-06-08: Corridor-weight orchestration rules introduced for rush-hour rerouting.",
+        ],
+    },
+    {
+        "organization": "City General Hospital",
+        "location": {
+            "campus": "Downtown Surgical Campus",
+            "address": "801 N. Central Ave, Phoenix, AZ 85004",
+            "city": "Phoenix",
+            "state": "Arizona",
+            "country": "USA",
+        },
+        "service_tier": "Surgery & Outpatient",
+        "deployed_since": "2026-01-19",
+        "fleet_controller_device": "RDX-FLEET-CTRL-CGH-01",
+        "contract_owner": "Dr. Alan Grant",
+        "notes": "General transport fleet for surgery handoff corridors and outpatient movement.",
+        "rovex_history": [
+            "2026-01-19: Main transport fleet commissioned for outpatient-to-surgery movement.",
+            "2026-04-27: Battery health analytics dashboards added for fleet readiness checks.",
+        ],
+    },
+]
+
 # Seed Fleets (NoSQL Database Seed)
 # A fleet is the organization-scoped operational grouping of multiple robots.
 SEED_FLEETS = [
@@ -229,6 +273,7 @@ def get_config_summary() -> Dict[str, Any]:
         "valid_roles": list(VALID_ROLES),
         "log_path": LOG_FILE_PATH,
         "seed_users_count": len(SEED_USERS),
+        "seed_organizations_count": len(SEED_ORGANIZATIONS),
         "seed_fleets_count": len(SEED_FLEETS),
         "seed_robots_count": len(SEED_ROBOTS)
     }

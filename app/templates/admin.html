@@ -33,10 +33,16 @@
                 </div>
             </div>
 
-            <div class="flex items-center space-x-4">
+            <div class="flex items-center space-x-3 flex-wrap justify-center sm:justify-end">
                 <span id="userInfo" class="text-xs bg-slate-800 px-3 py-1.5 rounded-lg text-slate-300 font-medium">
                     <i class="fa-solid fa-user-shield text-violet-400 mr-1.5"></i> Admin: <span id="usernameVal">...</span>
                 </span>
+                <a href="/admin/organizations" class="text-xs bg-violet-600/15 hover:bg-violet-600/25 text-violet-300 border border-violet-500/30 px-3 py-1.5 rounded-lg transition duration-200">
+                    <i class="fa-solid fa-sitemap mr-1"></i> Organizations
+                </a>
+                <a href="/admin/sandbox" class="text-xs bg-emerald-600/15 hover:bg-emerald-600/25 text-emerald-300 border border-emerald-500/30 px-3 py-1.5 rounded-lg transition duration-200">
+                    <i class="fa-solid fa-flask-vial mr-1"></i> Sandbox
+                </a>
                 <a href="/core" class="text-xs bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-400 border border-indigo-500/30 px-3 py-1.5 rounded-lg transition duration-200">
                     <i class="fa-solid fa-compass mr-1"></i> Core Platform
                 </a>
@@ -51,51 +57,87 @@
     <main class="flex-grow max-w-7xl w-full mx-auto px-6 py-8 space-y-8">
         
         <!-- Dashboard Statistics Row -->
-        <section class="grid grid-cols-2 md:grid-cols-5 gap-4">
-            <div class="bg-slate-900/50 border border-slate-800/80 p-5 rounded-xl space-y-2">
+        <section class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+            <button onclick="openMetricDetailModal('total_users')" class="bg-slate-900/50 border border-slate-800/80 p-5 rounded-xl space-y-2 text-left hover:border-indigo-500/40 hover:bg-slate-900/70 transition">
                 <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Total Connected Users</span>
                 <div class="flex items-center justify-between">
                     <span id="statUsers" class="text-2xl font-extrabold text-white">0</span>
                     <i class="fa-solid fa-users text-xl text-indigo-500"></i>
                 </div>
-                <p class="text-[9px] text-slate-500">In relational SQL OLTP</p>
-            </div>
+                <p class="text-[9px] text-slate-500">Inspect users by role and organization</p>
+            </button>
 
-            <div class="bg-slate-900/50 border border-slate-800/80 p-5 rounded-xl space-y-2">
+            <button onclick="openMetricDetailModal('total_organizations')" class="bg-slate-900/50 border border-slate-800/80 p-5 rounded-xl space-y-2 text-left hover:border-violet-500/40 hover:bg-slate-900/70 transition">
+                <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Organizations</span>
+                <div class="flex items-center justify-between">
+                    <span id="statOrganizations" class="text-2xl font-extrabold text-white">0</span>
+                    <i class="fa-solid fa-hospital text-xl text-violet-400"></i>
+                </div>
+                <p class="text-[9px] text-slate-500">Contracts, deployments, and controllers</p>
+            </button>
+
+            <button onclick="openMetricDetailModal('total_fleets')" class="bg-slate-900/50 border border-slate-800/80 p-5 rounded-xl space-y-2 text-left hover:border-violet-500/40 hover:bg-slate-900/70 transition">
                 <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Registered Fleets</span>
                 <div class="flex items-center justify-between">
                     <span id="statFleets" class="text-2xl font-extrabold text-white">0</span>
                     <i class="fa-solid fa-layer-group text-xl text-violet-400"></i>
                 </div>
                 <p class="text-[9px] text-slate-500">Organization-scoped fleet groups</p>
-            </div>
+            </button>
 
-            <div class="bg-slate-900/50 border border-slate-800/80 p-5 rounded-xl space-y-2">
+            <button onclick="openMetricDetailModal('total_robots')" class="bg-slate-900/50 border border-slate-800/80 p-5 rounded-xl space-y-2 text-left hover:border-violet-500/40 hover:bg-slate-900/70 transition">
                 <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Fleet Robots</span>
                 <div class="flex items-center justify-between">
                     <span id="statRobots" class="text-2xl font-extrabold text-white">0</span>
                     <i class="fa-solid fa-robot text-xl text-violet-500"></i>
                 </div>
                 <p class="text-[9px] text-slate-500">Robots assigned into hospital fleets</p>
-            </div>
+            </button>
 
-            <div class="bg-slate-900/50 border border-slate-800/80 p-5 rounded-xl space-y-2">
+            <button onclick="openMetricDetailModal('online_robots')" class="bg-slate-900/50 border border-slate-800/80 p-5 rounded-xl space-y-2 text-left hover:border-emerald-500/40 hover:bg-slate-900/70 transition">
+                <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Dispatchable / Online</span>
+                <div class="flex items-center justify-between">
+                    <span id="statOnlineRobots" class="text-2xl font-extrabold text-white">0</span>
+                    <i class="fa-solid fa-signal text-xl text-emerald-500"></i>
+                </div>
+                <p class="text-[9px] text-slate-500">Idle, transit, and charging fleet devices</p>
+            </button>
+
+            <button onclick="openMetricDetailModal('average_robot_battery')" class="bg-slate-900/50 border border-slate-800/80 p-5 rounded-xl space-y-2 text-left hover:border-emerald-500/40 hover:bg-slate-900/70 transition">
                 <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Average Fleet Power</span>
                 <div class="flex items-center justify-between">
                     <span id="statBattery" class="text-2xl font-extrabold text-white">0.0%</span>
                     <i class="fa-solid fa-battery-three-quarters text-xl text-emerald-500"></i>
                 </div>
                 <p class="text-[9px] text-slate-500">Weighted charge remaining</p>
-            </div>
+            </button>
 
-            <div class="bg-slate-900/50 border border-slate-800/80 p-5 rounded-xl space-y-2">
+            <button onclick="openMetricDetailModal('pending_tasks')" class="bg-slate-900/50 border border-slate-800/80 p-5 rounded-xl space-y-2 text-left hover:border-amber-500/40 hover:bg-slate-900/70 transition">
+                <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Pending Missions</span>
+                <div class="flex items-center justify-between">
+                    <span id="statPendingTasks" class="text-2xl font-extrabold text-white">0</span>
+                    <i class="fa-solid fa-clock text-xl text-amber-400"></i>
+                </div>
+                <p class="text-[9px] text-slate-500">Tasks waiting for fleet capacity</p>
+            </button>
+
+            <button onclick="openMetricDetailModal('completed_tasks')" class="bg-slate-900/50 border border-slate-800/80 p-5 rounded-xl space-y-2 text-left hover:border-cyan-500/40 hover:bg-slate-900/70 transition">
+                <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Completed Missions</span>
+                <div class="flex items-center justify-between">
+                    <span id="statCompletedTasks" class="text-2xl font-extrabold text-white">0</span>
+                    <i class="fa-solid fa-circle-check text-xl text-cyan-400"></i>
+                </div>
+                <p class="text-[9px] text-slate-500">Historical finished mission rollups</p>
+            </button>
+
+            <button onclick="openMetricDetailModal('un_sanctioned_robots')" class="bg-slate-900/50 border border-slate-800/80 p-5 rounded-xl space-y-2 text-left hover:border-rose-500/40 hover:bg-slate-900/70 transition">
                 <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Offline / Unsanctioned</span>
                 <div class="flex items-center justify-between">
                     <span id="statUnsanctioned" class="text-2xl font-extrabold text-white">0</span>
                     <i class="fa-solid fa-ban text-xl text-rose-500"></i>
                 </div>
-                <p class="text-[9px] text-slate-500">Schedules locked offline</p>
-            </div>
+                <p class="text-[9px] text-slate-500">See blocked robots and their fleet impact</p>
+            </button>
         </section>
 
         <!-- Relational & Document View Split -->
@@ -168,15 +210,20 @@
 
         <!-- Robot Registry -->
         <section class="bg-slate-900/30 border border-slate-800 p-6 rounded-2xl space-y-4">
-            <div class="flex justify-between items-center">
+            <div class="flex justify-between items-center gap-3">
                 <div>
                     <h3 class="font-bold text-base flex items-center space-x-2">
                         <i class="fa-solid fa-robot text-violet-400"></i>
                         <span>Robot Registry & Sanction Controls</span>
                     </h3>
-                    <p class="text-[11px] text-slate-400">Robots belong to organization-scoped fleets and can be sanctioned from this panel.</p>
+                    <p class="text-[11px] text-slate-400">Robots belong to organization-scoped fleets and can be onboarded, removed, or sanctioned from this panel.</p>
                 </div>
-                <span class="text-[9px] px-2 py-0.5 font-mono bg-violet-950 text-violet-400 border border-violet-900 rounded">Fleet-linked robots</span>
+                <div class="flex items-center gap-2">
+                    <span class="text-[9px] px-2 py-0.5 font-mono bg-violet-950 text-violet-400 border border-violet-900 rounded">Fleet-linked robots</span>
+                    <button onclick="openCreateRobotModal()" class="text-[10px] bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3 py-1.5 rounded-lg transition">
+                        <i class="fa-solid fa-robot mr-1"></i> Add Robot
+                    </button>
+                </div>
             </div>
             
             <div class="overflow-x-auto">
@@ -190,14 +237,42 @@
                             <th class="p-3">Battery</th>
                             <th class="p-3">State</th>
                             <th class="p-3">Sanctioned</th>
+                            <th class="p-3">Actions</th>
                         </tr>
                     </thead>
                     <tbody id="robotsTableBody">
                         <tr>
-                            <td colspan="7" class="p-4 text-center text-slate-500">Loading robot registry...</td>
+                            <td colspan="8" class="p-4 text-center text-slate-500">Loading robot registry...</td>
                         </tr>
                     </tbody>
                 </table>
+            </div>
+        </section>
+
+        <!-- Admin Control Center Shortcuts -->
+        <section class="bg-slate-900/40 border border-slate-800 p-6 rounded-2xl space-y-4">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h3 class="font-bold text-base flex items-center space-x-2">
+                        <i class="fa-solid fa-compass-drafting text-cyan-400"></i>
+                        <span>Admin Control Center</span>
+                    </h3>
+                    <p class="text-[11px] text-slate-400">Jump into organization governance, the advanced sandbox, or fleet registry operations.</p>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <a href="/admin/organizations" class="bg-slate-950/70 border border-slate-800 rounded-xl p-4 hover:border-violet-500/40 transition">
+                    <div class="text-violet-400 text-sm font-bold"><i class="fa-solid fa-sitemap mr-1"></i> Organization Management</div>
+                    <p class="mt-2 text-[11px] text-slate-400">Inspect controller trees, fleet-wise robot detail, and deployment history for every hospital.</p>
+                </a>
+                <a href="/admin/sandbox" class="bg-slate-950/70 border border-slate-800 rounded-xl p-4 hover:border-emerald-500/40 transition">
+                    <div class="text-emerald-400 text-sm font-bold"><i class="fa-solid fa-flask-vial mr-1"></i> Advanced Sandbox</div>
+                    <p class="mt-2 text-[11px] text-slate-400">Run richer SQL and NoSQL inspection commands on a dedicated explorer page.</p>
+                </a>
+                <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-4">
+                    <div class="text-indigo-400 text-sm font-bold"><i class="fa-solid fa-sliders mr-1"></i> Portal Control Scope</div>
+                    <p class="mt-2 text-[11px] text-slate-400">Admins retain global access to user provisioning, robot onboarding, sanction controls, org views, logs, and sandbox inspection.</p>
+                </div>
             </div>
         </section>
 
@@ -221,87 +296,134 @@
             </div>
         </section>
 
-        <!-- Database Sandbox Workspace -->
-        <section class="bg-slate-900/60 border border-slate-800 p-6 rounded-2xl space-y-6">
-            <div class="border-b border-slate-800 pb-4">
-                <h3 class="font-bold text-lg flex items-center space-x-2">
-                    <i class="fa-solid fa-shield-halved text-rose-400"></i>
-                    <span>Secured Database Sandbox Query Workspace</span>
-                </h3>
-                <p class="text-xs text-slate-400">Run manual SQL select or mock PyMongo commands against the active database engines instantly.</p>
-            </div>
-
-            <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
-                
-                <!-- Query Config Side -->
-                <div class="lg:col-span-2 space-y-4">
-                    <div>
-                        <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Target Database Engine</label>
-                        <div class="grid grid-cols-2 gap-2">
-                            <button id="btnSql" onclick="setDbEngine('sql')" class="p-3 rounded-xl border border-slate-700 bg-indigo-950/20 text-indigo-400 font-bold text-xs flex flex-col items-center justify-center space-y-1 hover:bg-indigo-950/40 transition">
-                                <i class="fa-solid fa-database text-base"></i>
-                                <span>SQL (SQLite OLTP)</span>
-                            </button>
-                            <button id="btnNoSql" onclick="setDbEngine('nosql')" class="p-3 rounded-xl border border-slate-800 bg-slate-950 text-slate-500 font-bold text-xs flex flex-col items-center justify-center space-y-1 hover:bg-violet-950/20 hover:text-violet-400 transition">
-                                <i class="fa-solid fa-cubes text-base"></i>
-                                <span>NoSQL (PyMongo)</span>
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Sandbox Templates -->
-                    <div>
-                        <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Query Snippet Templates</label>
-                        <div class="space-y-2" id="templatesList">
-                            <!-- SQL Templates -->
-                            <button onclick="applyTemplate('SELECT * FROM users')" class="sql-template w-full text-left p-2.5 bg-slate-950 hover:bg-slate-900 border border-slate-800/80 rounded-lg text-xs font-mono-custom text-indigo-300 transition block">
-                                SELECT * FROM users;
-                            </button>
-                            <button onclick="applyTemplate('SELECT * FROM tasks WHERE status=\'ongoing\'')" class="sql-template w-full text-left p-2.5 bg-slate-950 hover:bg-slate-900 border border-slate-800/80 rounded-lg text-xs font-mono-custom text-indigo-300 transition block">
-                                SELECT * FROM tasks WHERE status='ongoing';
-                            </button>
-                            
-                            <!-- NoSQL Templates (Hidden by default) -->
-                            <button onclick="applyTemplate('db.robots.find()')" class="nosql-template hidden w-full text-left p-2.5 bg-slate-950 hover:bg-slate-900 border border-slate-800/80 rounded-lg text-xs font-mono-custom text-violet-300 transition block">
-                                db.robots.find()
-                            </button>
-                            <button onclick="applyTemplate('db.robots.find({\'battery\': {\'$lt\': 50}})')" class="nosql-template hidden w-full text-left p-2.5 bg-slate-950 hover:bg-slate-900 border border-slate-800/80 rounded-lg text-xs font-mono-custom text-violet-300 transition block">
-                                db.robots.find({"battery": {"$lt": 50}})
-                            </button>
-                            <button onclick="applyTemplate('db.notifications.find({\'category\': \'CRITICAL\'})')" class="nosql-template hidden w-full text-left p-2.5 bg-slate-950 hover:bg-slate-900 border border-slate-800/80 rounded-lg text-xs font-mono-custom text-violet-300 transition block">
-                                db.notifications.find({"category": "CRITICAL"})
-                            </button>
-                        </div>
-                    </div>
+        <!-- Advanced Sandbox Launch -->
+        <section class="bg-slate-900/60 border border-slate-800 p-6 rounded-2xl space-y-4">
+            <div class="flex justify-between items-center gap-4">
+                <div>
+                    <h3 class="font-bold text-lg flex items-center space-x-2">
+                        <i class="fa-solid fa-shield-halved text-rose-400"></i>
+                        <span>Advanced Sandbox Workspace</span>
+                    </h3>
+                    <p class="text-xs text-slate-400">The richer SQL/NoSQL explorer now lives on a dedicated page with discovery metadata, examples, and broader read-only inspection commands.</p>
                 </div>
-
-                <!-- Query Editor & Output Side -->
-                <div class="lg:col-span-3 space-y-4">
-                    <div>
-                        <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Sandbox Editor</label>
-                        <textarea id="queryEditor" rows="5" class="w-full bg-slate-950 font-mono-custom text-xs p-4 rounded-xl border border-slate-800 focus:border-indigo-500 focus:outline-none text-emerald-400 whitespace-pre leading-relaxed select-text" placeholder="Enter query here...">SELECT * FROM users</textarea>
-                    </div>
-
-                    <div class="flex justify-between items-center">
-                        <span class="text-[10px] text-slate-500"><i class="fa-solid fa-triangle-exclamation text-yellow-500/80 mr-1"></i> SELECT statements only are authorized in the SQL sandbox.</span>
-                        <button onclick="executeQuery()" class="bg-gradient-to-r from-rose-600 to-violet-600 hover:from-rose-500 hover:to-violet-500 text-white font-bold text-xs px-6 py-2.5 rounded-xl transition shadow-lg shadow-rose-600/10 hover:shadow-rose-600/25">
-                            <i class="fa-solid fa-play mr-1.5"></i> Run Sandbox Query
-                        </button>
-                    </div>
-
-                    <!-- Query Result Output -->
-                    <div class="space-y-2">
-                        <label class="block text-xs font-bold uppercase tracking-wider text-slate-400">Query Results</label>
-                        <div class="bg-black/90 border border-slate-800/80 rounded-xl p-4 overflow-x-auto">
-                            <pre id="queryResult" class="text-[11px] font-mono-custom text-slate-300 max-h-56 overflow-y-auto leading-relaxed select-text">Execution outputs will be displayed here...</pre>
-                        </div>
-                    </div>
-                </div>
-
+                <a href="/admin/sandbox" class="bg-gradient-to-r from-rose-600 to-violet-600 hover:from-rose-500 hover:to-violet-500 text-white font-bold text-xs px-6 py-2.5 rounded-xl transition shadow-lg shadow-rose-600/10 hover:shadow-rose-600/25 whitespace-nowrap">
+                    <i class="fa-solid fa-flask-vial mr-1.5"></i> Open Sandbox Page
+                </a>
             </div>
         </section>
 
     </main>
+
+    <!-- Metric Detail Modal -->
+    <div id="metricDetailModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm hidden px-4">
+        <div class="bg-slate-900 border border-slate-800 max-w-3xl w-full rounded-2xl p-6 space-y-4 max-h-[85vh] overflow-hidden flex flex-col">
+            <div class="flex justify-between items-center pb-2 border-b border-slate-800">
+                <div>
+                    <h3 id="metricDetailTitle" class="font-bold text-sm flex items-center space-x-2 text-white">Metric Detail</h3>
+                    <p id="metricDetailDescription" class="text-[11px] text-slate-400 mt-1"></p>
+                </div>
+                <button onclick="closeMetricDetailModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div id="metricDetailSummary" class="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs"></div>
+            <div class="flex-1 overflow-auto bg-black/50 border border-slate-800 rounded-xl p-4">
+                <pre id="metricDetailContent" class="text-[11px] font-mono-custom text-slate-300 whitespace-pre-wrap select-text">Loading metric detail...</pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Robot Modal -->
+    <div id="createRobotModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm hidden px-4">
+        <div class="bg-slate-900 border border-slate-800 max-w-2xl w-full rounded-2xl p-6 space-y-4">
+            <div class="flex justify-between items-center pb-2 border-b border-slate-800">
+                <div>
+                    <h3 class="font-bold text-sm flex items-center space-x-2">
+                        <i class="fa-solid fa-robot text-emerald-400"></i>
+                        <span>Onboard Fleet Robot</span>
+                    </h3>
+                    <p class="text-[11px] text-slate-400 mt-1">Admins can attach a new robot to an existing organization fleet.</p>
+                </div>
+                <button onclick="closeCreateRobotModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <form id="createRobotForm" class="space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5" for="createRobotId">Robot ID</label>
+                        <input id="createRobotId" type="text" class="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 focus:outline-none px-3 py-2 rounded-xl text-xs" required>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5" for="createRobotSerial">Serial Number</label>
+                        <input id="createRobotSerial" type="text" class="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 focus:outline-none px-3 py-2 rounded-xl text-xs" required>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5" for="createRobotOrganization">Organization</label>
+                        <select id="createRobotOrganization" class="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 focus:outline-none px-3 py-2 rounded-xl text-xs" onchange="syncFleetOptionsForRobotForm()" required></select>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5" for="createRobotFleet">Fleet</label>
+                        <select id="createRobotFleet" class="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 focus:outline-none px-3 py-2 rounded-xl text-xs" required></select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5" for="createRobotBattery">Battery %</label>
+                        <input id="createRobotBattery" type="number" min="0" max="100" step="0.1" value="100" class="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 focus:outline-none px-3 py-2 rounded-xl text-xs" required>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5" for="createRobotStatus">Status</label>
+                        <select id="createRobotStatus" class="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 focus:outline-none px-3 py-2 rounded-xl text-xs">
+                            <option value="idle">Idle</option>
+                            <option value="charging">Charging</option>
+                            <option value="transit">Transit</option>
+                            <option value="error">Error</option>
+                        </select>
+                    </div>
+                    <div class="flex items-end">
+                        <label class="flex items-center gap-2 text-xs text-slate-300">
+                            <input id="createRobotSanctioned" type="checkbox" checked class="rounded border-slate-700 bg-slate-950 text-emerald-500">
+                            Sanctioned
+                        </label>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5" for="createRobotLocation">Location</label>
+                        <input id="createRobotLocation" type="text" value="Reception" class="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 focus:outline-none px-3 py-2 rounded-xl text-xs" required>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5" for="createRobotX">X (m)</label>
+                        <input id="createRobotX" type="number" step="0.1" value="0" class="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 focus:outline-none px-3 py-2 rounded-xl text-xs" required>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5" for="createRobotY">Y (m)</label>
+                        <input id="createRobotY" type="number" step="0.1" value="0" class="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 focus:outline-none px-3 py-2 rounded-xl text-xs" required>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5" for="createRobotServiced">Last Serviced</label>
+                        <input id="createRobotServiced" type="text" value="2026-08-01T00:00:00Z" class="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 focus:outline-none px-3 py-2 rounded-xl text-xs" required>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5" for="createRobotProblem">Last Problem</label>
+                        <input id="createRobotProblem" type="text" value="None" class="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 focus:outline-none px-3 py-2 rounded-xl text-xs" required>
+                    </div>
+                </div>
+
+                <div id="createRobotErrorBox" class="hidden text-xs bg-rose-500/10 border border-rose-500/20 text-rose-400 p-3 rounded-lg"></div>
+
+                <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 rounded-xl text-xs transition">
+                    Add Robot to Fleet <i class="fa-solid fa-chevron-right ml-1"></i>
+                </button>
+            </form>
+        </div>
+    </div>
 
     <!-- Admin Create User Modal -->
     <div id="createUserModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm hidden px-4">

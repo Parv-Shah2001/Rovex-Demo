@@ -171,6 +171,13 @@ function closeUserCreateModal() {
     setModalVisibility('userCreateModal', false);
     document.getElementById('userCreateErrorBox').classList.add('hidden');
 }
+function openOrganizationTreeModal() {
+    setModalVisibility('organizationTreeModal', true);
+    loadOrganizationTreeModal();
+}
+function closeOrganizationTreeModal() {
+    setModalVisibility('organizationTreeModal', false);
+}
 
 async function submitCreateUserForm(event) {
     event.preventDefault();
@@ -202,6 +209,51 @@ async function submitCreateUserForm(event) {
     }
 }
 
+async function loadOrganizationTreeModal() {
+    const contentEl = document.getElementById('organizationTreeModalContent');
+    if (!contentEl) return;
+    contentEl.innerHTML = '<div class="text-slate-500">Loading organization structure...</div>';
+
+    try {
+        const detail = await apiRequest(`/api/organizations/${encodeURIComponent(userObj.organization)}`);
+        const controllerTree = detail.controller_tree;
+        const controllerSections = [
+            ['Supervisors', controllerTree.supervisors],
+            ['Sub-Supervisors', controllerTree['sub-supervisors']],
+            ['Employees', controllerTree.employees],
+        ].map(([label, users]) => `
+            <div class="bg-slate-950/60 border border-slate-800 rounded-xl p-4 space-y-2">
+                <h4 class="text-sm font-semibold text-white">${label}</h4>
+                ${users.length ? users.map((user) => `
+                    <div class="border border-slate-800 rounded-lg p-3 bg-slate-950/40">
+                        <div class="font-semibold text-slate-200">${user.full_name}</div>
+                        <div class="text-[10px] text-slate-500 font-mono-custom">${user.username}</div>
+                        <div class="text-[11px] text-slate-400">${user.email}</div>
+                    </div>
+                `).join('') : '<div class="text-xs text-slate-500">No users in this branch.</div>'}
+            </div>
+        `).join('');
+
+        const fleetMarkup = renderFleetCards(detail.fleets);
+        contentEl.innerHTML = `
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div class="bg-slate-950/60 border border-slate-800 rounded-xl p-4 space-y-2">
+                    <div class="text-sm font-semibold text-white">${detail.organization}</div>
+                    <div class="text-[11px] text-slate-400">${detail.location.campus} · ${detail.location.city}, ${detail.location.state}</div>
+                    <div class="text-[11px] text-slate-400">Controller: ${detail.fleet_controller_device}</div>
+                    <div class="text-[11px] text-slate-400">Service Tier: ${detail.service_tier}</div>
+                    <div class="text-[11px] text-slate-500">${detail.notes}</div>
+                </div>
+                <div class="space-y-2">${fleetMarkup.html}</div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">${controllerSections}</div>
+        `;
+    } catch (error) {
+        contentEl.innerHTML = `<div class="text-rose-400">${error.message || 'Failed to load organization structure.'}</div>`;
+        console.error(error);
+    }
+}
+
 // Clear Conversation Log
 function clearChat() {
     const chatHistory = document.getElementById('chatHistory');
@@ -211,37 +263,31 @@ function clearChat() {
     welcome.classList.remove('hidden');
 }
 
-async function fetchFleetSummary() {
-    const fleetPanel = document.getElementById('fleetSummaryPanel');
-    if (!fleetPanel) return;
-
-    try {
-        const fleets = await apiRequest('/api/robots/fleets');
-        if (!fleets.length) {
-            fleetPanel.innerHTML = '<div class="text-slate-500">No fleet registry data available.</div>';
-            return;
-        }
-
-        const totalRobots = fleets.reduce((sum, fleet) => sum + fleet.total_robot_count, 0);
-        const totalIdle = fleets.reduce((sum, fleet) => sum + fleet.idle_robot_count, 0);
-        const totalUnsanctioned = fleets.reduce((sum, fleet) => sum + fleet.unsanctioned_robot_count, 0);
-        const fleetRows = fleets.map((fleet) => `
-            <div class="border border-slate-800 rounded-lg p-3 bg-slate-950/40">
-                <div class="flex justify-between items-start gap-3">
-                    <div>
-                        <div class="text-[11px] font-bold text-white">${fleet.fleet_name}</div>
-                        <div class="text-[10px] text-slate-500 font-mono-custom">${fleet.fleet_id}</div>
-                    </div>
-                    <span class="text-[10px] px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">${fleet.total_robot_count} robots</span>
+function renderFleetCards(fleets) {
+    const totalRobots = fleets.reduce((sum, fleet) => sum + fleet.total_robot_count, 0);
+    const totalIdle = fleets.reduce((sum, fleet) => sum + fleet.idle_robot_count, 0);
+    const totalUnsanctioned = fleets.reduce((sum, fleet) => sum + fleet.unsanctioned_robot_count, 0);
+    const fleetRows = fleets.map((fleet) => `
+        <div class="border border-slate-800 rounded-lg p-3 bg-slate-950/40">
+            <div class="flex justify-between items-start gap-3">
+                <div>
+                    <div class="text-[11px] font-bold text-white">${fleet.fleet_name}</div>
+                    <div class="text-[10px] text-slate-500 font-mono-custom">${fleet.fleet_id}</div>
                 </div>
-                <div class="mt-2 text-[10px] text-slate-400 flex justify-between">
-                    <span>Idle ready: <span class="text-emerald-400 font-semibold">${fleet.idle_robot_count}</span></span>
-                    <span>Unsanctioned: <span class="text-rose-400 font-semibold">${fleet.unsanctioned_robot_count}</span></span>
-                </div>
+                <span class="text-[10px] px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">${fleet.total_robot_count} robots</span>
             </div>
-        `).join('');
+            <div class="mt-2 text-[10px] text-slate-400 flex justify-between">
+                <span>Idle ready: <span class="text-emerald-400 font-semibold">${fleet.idle_robot_count}</span></span>
+                <span>Unsanctioned: <span class="text-rose-400 font-semibold">${fleet.unsanctioned_robot_count}</span></span>
+            </div>
+        </div>
+    `).join('');
 
-        fleetPanel.innerHTML = `
+    return {
+        totalRobots,
+        totalIdle,
+        totalUnsanctioned,
+        html: `
             <div class="grid grid-cols-3 gap-2 text-center">
                 <div class="bg-slate-950/60 rounded-lg border border-slate-800 p-2">
                     <span class="block text-[9px] uppercase tracking-wider text-slate-500">Fleets</span>
@@ -258,7 +304,23 @@ async function fetchFleetSummary() {
             </div>
             <div class="text-[10px] text-slate-500">Unsanctioned robots across this organization: <span class="text-rose-400 font-semibold">${totalUnsanctioned}</span></div>
             <div class="space-y-2">${fleetRows}</div>
-        `;
+        `,
+    };
+}
+
+async function fetchFleetSummary() {
+    const fleetPanel = document.getElementById('fleetSummaryPanel');
+    if (!fleetPanel) return;
+
+    try {
+        const fleets = await apiRequest('/api/robots/fleets');
+        if (!fleets.length) {
+            fleetPanel.innerHTML = '<div class="text-slate-500">No fleet registry data available.</div>';
+            return;
+        }
+
+        const fleetMarkup = renderFleetCards(fleets);
+        fleetPanel.innerHTML = fleetMarkup.html;
     } catch (error) {
         fleetPanel.innerHTML = '<div class="text-rose-400">Failed to load fleet registry.</div>';
         console.error(error);
